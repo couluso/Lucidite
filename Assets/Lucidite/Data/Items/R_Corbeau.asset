@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 594c91d710cdb234fbf68a6cef67b53c, type: 3}
+  m_Name: R_Corbeau
+  m_EditorClassIdentifier: Assembly-CSharp::Lucidite.ItemData
+  itemName: Le Corbeau
+  kind: 0
+  effect: 6
+  value: 20
+  price: 90
+  flavorText: "Perch\xE9 sur les livres que tu ne lis plus. \xAB Jamais plus \xBB, mais moins cher."
+  tint: {r: 0.101960786, g: 0.09019608, b: 0.09019608, a: 1}
+  model: {fileID: 3100206400866977506, guid: e6a892c56b8feb147993dca8ce407f71, type: 3}
+  enemyCanBuy: 0
+  rare: 0

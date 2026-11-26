@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 594c91d710cdb234fbf68a6cef67b53c, type: 3}
+  m_Name: R_Penseur
+  m_EditorClassIdentifier: Assembly-CSharp::Lucidite.ItemData
+  itemName: "Le Penseur vo\xFBt\xE9"
+  kind: 0
+  effect: 2
+  value: 2
+  price: 105
+  flavorText: "La t\xEAte entre les mains, il ressasse. Parfois, il en sort une id\xE9e."
+  tint: {r: 0.36862746, g: 0.3137255, b: 0.19607843, a: 1}
+  model: {fileID: 7144012879628701430, guid: 2c9fd33d3224c3143bed272b43d10df1, type: 3}
+  enemyCanBuy: 0
+  rare: 0

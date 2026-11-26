@@ -18,6 +18,9 @@ MonoBehaviour:
   rarity: 1
   theme: 11
   flavorText: Encore une minute. Puis une autre.
+  icon: {fileID: 2800000, guid: 69f9cb8d15af4dd40b87e125be590791, type: 3}
+  face: {fileID: 2800000, guid: 6e5d60848f03c77488fcdd990952378e, type: 3}
+  faceUpgraded: {fileID: 0}
   cost: 1
   unplayable: 0
   damage: 0

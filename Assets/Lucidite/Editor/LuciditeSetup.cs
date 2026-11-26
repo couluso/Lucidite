@@ -82,10 +82,10 @@ namespace Lucidite.EditorTools
                 Step("Interface", 0.7f);
                 var offerCard = UIFactory.CardUI("CardUI_Offer", 1.05f);
                 var smallCard = UIFactory.CardUI("CardUI_Small", 0.8f);
-                var itemOffer = UIFactory.ItemUI("ItemUI_Offer", false);
+                var good = UIFactory.GoodUI("ShopGood");
                 var itemButton = UIFactory.ItemUI("ItemUI_Button", true);
                 UIFactory.PSXOutput();
-                UIFactory.GameUI(offerCard, smallCard, itemOffer, itemButton);
+                UIFactory.GameUI(offerCard, smallCard, good, itemButton);
 
                 Step("Post-process", 0.8f);
                 BuildVolumeProfile();
@@ -164,7 +164,10 @@ namespace Lucidite.EditorTools
             TexWallpaperV2 = Tex(TexturePainter.Wallpaper(256, 5), "T_Wallpaper");
             TexConcrete = Tex(TextureFactory.Concrete(128, 11), "T_Concrete");
             TexCardFront = Tex(TextureFactory.CardFront(), "T_CardFront", false);
-            TexCardBack = Tex(TextureFactory.CardBack(), "T_CardBack", false);
+            // Dos aux coins arrondis (comme la face) : coins transparents + découpe alpha du matériau
+            TexCardBack = Tex(CardFaceFactory.RoundCorners(TextureFactory.CardBack(), CardFaceFactory.CornerFrac), "T_CardBack", false, true);
+            // Contour lumineux (carte sélectionnée) : rectangle arrondi blanc 1.15 x 1.65, coins un peu plus ronds
+            TexCardGlow = Tex(CardFaceFactory.RoundCorners(new TextureFactory.Canvas(115, 165, Color.white), 0.13f), "T_CardGlow", false, true);
             TexPlayerSkin = Tex(TexturePainter.Skin(Palette.Skin, 1, true, false), "T_Skin");
             TexGraySkinV2 = Tex(TexturePainter.Skin(Palette.Ash, 2, true, true), "T_GraySkin");
             TexFace = Tex(TexturePainter.DepressionFace(Palette.Ash), "T_DepressionFace");
@@ -211,21 +214,78 @@ namespace Lucidite.EditorTools
             ArtLibrary.cardBack = TexCardBack;
             ArtLibrary.bloodDropIcon = SpriteDrop ? SpriteDrop.texture : null;
             ArtLibrary.lucidityIcon = SpriteFlame ? SpriteFlame.texture : null;
+
+            // Design des cartes : faces par type, rond coût/valeur, icônes de bonus (les grandes icônes sont faites par DataFactory)
+            AssetFactory.EnsureFolder(AssetFactory.TexDir + "/CardFaces");
+            Texture2D FaceTex(Color col, bool enemy, string name) =>
+                TextureFactory.Save(CardFaceFactory.Face(col, enemy), $"{AssetFactory.TexDir}/CardFaces/{name}.png", point: false, repeat: false, mips: true);
+            ArtLibrary.faceAttack = FaceTex(Palette.TypeAttack, false, "Face_Attaque");
+            ArtLibrary.faceDefense = FaceTex(Palette.TypeDefense, false, "Face_Defense");
+            ArtLibrary.faceTorment = FaceTex(Palette.TypeTorment, false, "Face_Tourment");
+            ArtLibrary.faceCrisis = FaceTex(Palette.TypeCrisis, false, "Face_Crise");
+            ArtLibrary.faceEnemy = FaceTex(Palette.TypeEnemy, true, "Face_Depression");
+            ArtLibrary.orb = TextureFactory.Save(CardFaceFactory.Orb(), $"{AssetFactory.TexDir}/CardFaces/Orb.png", point: false, repeat: false, alpha: true, mips: true);
+            ArtLibrary.iconFallback = CardFaceFactory.SaveIcon("_Fallback");
+            ArtLibrary.cardBlood = new List<Texture2D>();
+            for (int i = 0; i < 4; i++)
+                ArtLibrary.cardBlood.Add(TextureFactory.Save(CardFaceFactory.BloodMask(i), $"{AssetFactory.TexDir}/CardFaces/Blood_{i}.png", point: false, repeat: false, mips: true));
+            ArtLibrary.statIcons = new List<CardArtLibrary.StatEntry>();
+            foreach (CardStat st in System.Enum.GetValues(typeof(CardStat)))
+                ArtLibrary.statIcons.Add(new CardArtLibrary.StatEntry
+                {
+                    stat = st,
+                    texture = TextureFactory.Save(CardFaceFactory.StatIcon(st), $"{AssetFactory.TexDir}/CardFaces/Stat_{st}.png", point: false, repeat: false, alpha: true, mips: true)
+                });
+            // Classes : calque de face (symbole sous le coût + motif de fond) et symbole seul pour l'UI (index 0 = sans classe)
+            ArtLibrary.suitOverlays = new List<Texture2D> { null };
+            ArtLibrary.suitIcons = new List<Texture2D> { null };
+            for (int s = 1; s <= 4; s++)
+            {
+                ArtLibrary.suitOverlays.Add(CardFaceFactory.SaveSuitOverlay((CardSuit)s));
+                ArtLibrary.suitIcons.Add(CardFaceFactory.SaveSuitIcon((CardSuit)s));
+            }
             EditorUtility.SetDirty(ArtLibrary);
         }
 
         // ------------------------------------------------------------------ Matériaux
+        /// <summary>Coins arrondis des cartes : découpe alpha (les coins de la texture sont transparents).</summary>
+        static void ClipCorners(Material m)
+        {
+            m.SetFloat("_AlphaClip", 1f); m.SetFloat("_Cutoff", 0.5f); m.EnableKeyword("_ALPHATEST_ON");
+            m.renderQueue = (int)RenderQueue.AlphaTest;
+            m.SetOverrideTag("RenderType", "TransparentCutout");
+            EditorUtility.SetDirty(m);
+        }
+
+        static Texture2D TexCardGlow;
+
         static void BuildMaterials()
         {
             // Cartes : URP/Lit (pas de tremblement de sommets, pour rester lisibles)
             AssetFactory.UsePSX = false;
-            CardFront = AssetFactory.LitEmissive("M_CardFront", Color.white, Palette.Hex("1A1818"), TexCardFront, TexCardFront);
+            // Face noire : l'émission (x0.45) garde les contours colorés lisibles dans la pénombre
+            // Face : shader PS1 (sans tremblement ni mapping affine) pour sa carte de « blessures » : le sang des
+            // projections apparaît progressivement sur la carte (_Damage par carte, CardView.ApplyBlood)
+            AssetFactory.UsePSX = true;
+            CardFront = AssetFactory.LitEmissive("M_CardFront", Color.white, Palette.Hex("737373"), ArtLibrary.faceAttack, ArtLibrary.faceAttack);
+            AssetFactory.UsePSX = false;
+            CardFront.SetFloat("_Jitter", 0f); CardFront.SetFloat("_Affine", 0f); CardFront.SetFloat("_Wrap", 0.35f);
+            CardFront.SetFloat("_DamageMix", 0.88f); CardFront.SetFloat("_Damage", 0f); CardFront.SetFloat("_DamageGlow", 1.3f);
+            if (ArtLibrary.cardBlood.Count > 0) CardFront.SetTexture("_DamageMap", ArtLibrary.cardBlood[0]);
             CardBack = AssetFactory.Lit("M_CardBack", Color.white, TexCardBack, 0.3f);
+            ClipCorners(CardFront); ClipCorners(CardBack);
             CardArt = AssetFactory.LitEmissive("M_CardArt", Color.white, Palette.Hex("2A2626"), ArtLibrary.fallback, ArtLibrary.fallback);
+            // Grande icône (blanche, teintée par le type) et icônes de bonus (en couleur) : découpe alpha + émission
+            CardIcon = AssetFactory.LitCutout("M_CardIcon", ArtLibrary.iconFallback, Color.white, 0.5f);
+            CardIcon.EnableKeyword("_EMISSION"); CardIcon.SetColor("_EmissionColor", Palette.Hex("555555")); CardIcon.SetTexture("_EmissionMap", ArtLibrary.iconFallback);
+            CardBonus = AssetFactory.LitCutout("M_CardBonus", ArtLibrary.Stat(CardStat.Force), Color.white, 0.5f);
+            CardBonus.EnableKeyword("_EMISSION"); CardBonus.SetColor("_EmissionColor", Palette.Hex("737373")); CardBonus.SetTexture("_EmissionMap", ArtLibrary.Stat(CardStat.Force));
+            EditorUtility.SetDirty(CardIcon); EditorUtility.SetDirty(CardBonus);
             AssetFactory.UsePSX = true;
 
-            Highlight = AssetFactory.Unlit("M_CardHighlight", Palette.BloodLight);
-            CostOrb = AssetFactory.Unlit("M_CostOrb", Palette.BloodDark, SpriteOrb ? SpriteOrb.texture : null);
+            Highlight = AssetFactory.Unlit("M_CardHighlight", Palette.BloodLight, TexCardGlow);
+            ClipCorners(Highlight);
+            CostOrb = AssetFactory.Unlit("M_CostOrb", Palette.TypeAttack, ArtLibrary.orb);
             CostOrb.SetFloat("_AlphaClip", 1f); CostOrb.SetFloat("_Cutoff", 0.5f); CostOrb.EnableKeyword("_ALPHATEST_ON");
             CostOrb.renderQueue = (int)RenderQueue.AlphaTest;
 
@@ -254,6 +314,7 @@ namespace Lucidite.EditorTools
             Crack = AssetFactory.LitCutout("M_Crack", TexCrack, Color.white, 0.5f);
             Blood = AssetFactory.Lit("M_Blood", Color.white, TexBlood, 0.85f);
             BloodPool = AssetFactory.Lit("M_BloodPool", Palette.Hex("8A1C1C"), TexBlood, 0.9f);
+            BloodPool.SetFloat("_Jitter", 0f); // flaques à plat : sans tremblement, elles ne s'enfoncent pas dans la table
             Wax = AssetFactory.Lit("M_Wax", Palette.Hex("C8BEAC"), TexPaperV2, 0.35f);
             Wick = AssetFactory.Lit("M_Wick", Palette.Void, null, 0f);
             Flame = AssetFactory.LitEmissive("M_Flame", Palette.Bulb, Palette.Bulb * 3f);
@@ -270,6 +331,7 @@ namespace Lucidite.EditorTools
             Rust = AssetFactory.Lit("M_Rust", Color.white, TexRust, 0.3f);
             Metal = AssetFactory.Lit("M_Metal", Color.white, TexMetal, 0.6f);
             Void = AssetFactory.Lit("M_Void", Palette.Void, null, 0f);
+            AssetFactory.Lit("M_Pill", Color.white, null, 0.75f); // gélules : texture posée par pilule (aspect tiré à chaque partie)
             DoorGap = AssetFactory.Unlit("M_DoorGap", Palette.Bulb * 0.6f);
             WindowGap = AssetFactory.Unlit("M_WindowGap", Palette.Hex("1E2430"));
             ParticleDust = AssetFactory.Particle("M_FX_Dust", TexDot, Color.white, true);
@@ -379,8 +441,11 @@ namespace Lucidite.EditorTools
             var lampGo = Inst(lamp.gameObject, env, new Vector3(0, 2.7f, 0.04f), Vector3.zero);
             shake.lamp = lampGo.GetComponent<HangingLamp>();
             var oppGo = Inst(opponent.gameObject, env, new Vector3(0, 0, 0.64f), new Vector3(0, 180, 0)); // assez près pour que ses jambes soient sous la table
+            var oppIk = oppGo.GetComponent<OpponentArmsIK>();
+            if (oppIk) { oppIk.tableTopHeight = 0.78f; oppIk.tableEdge = 0.64f - 0.45f; } // plateau 0.78 m, bord de son côté à z = 0.45
             ParticleDust = dustMat;
             var ceilingDust = PrefabFactory.CeilingDust(env);
+            shake.ceilingDust = ceilingDust;
 
             // --- Destruction de la pièce : collisions (gravats), fissures cachées, matériaux des débris
             Material Mat(string n) => AssetDatabase.LoadAssetAtPath<Material>($"{AssetFactory.MatDir}/{n}.mat");
@@ -430,10 +495,11 @@ namespace Lucidite.EditorTools
                 main.startSize = new ParticleSystem.MinMaxCurve(0.004f, 0.012f);
                 main.startColor = new Color(0.75f, 0.7f, 0.6f, 0.5f);
                 var em = tableDust.emission; em.enabled = false;
-                var sh = tableDust.shape; sh.shapeType = ParticleSystemShapeType.Sphere; sh.radius = 0.03f;
+                var sh = tableDust.shape; sh.shapeType = ParticleSystemShapeType.Sphere; sh.radius = 0.03f; sh.rotation = Vector3.zero;
+                var noise = tableDust.noise; noise.enabled = false;
             }
 
-            // --- Sang : gouttes et flaques (jusqu'à la manche suivante)
+            // --- Sang : gouttes et flaques (gardées toute la partie)
             var bloodGo = new GameObject("BloodSystem");
             bloodGo.transform.SetParent(env, false);
             var blood = bloodGo.AddComponent<BloodSystem>();
@@ -485,6 +551,7 @@ namespace Lucidite.EditorTools
             var camData = camGo.AddComponent<UniversalAdditionalCameraData>();
             camData.renderPostProcessing = true;
             camData.antialiasing = AntialiasingMode.None;
+            cam.cullingMask &= ~(1 << RelicStage.Layer); // le studio des statuettes de la boutique est filmé à part
             camGo.AddComponent<AudioListener>();
             var armsGo = Inst(arms.gameObject, camGo.transform, Vector3.zero, Vector3.zero);
             armsGo.SetActive(false);
@@ -516,8 +583,27 @@ namespace Lucidite.EditorTools
             var faceUp = Quaternion.Euler(90f, 0f, 0f);
             var faceDown = faceUp * Quaternion.Euler(0f, 180f, 0f);
             board.cardPrefab = card;
-            board.playerDeckPoint = Point("PlayerDeck", boardGo.transform, new Vector3(0.36f, 0.8f, -0.06f), faceDown);
-            board.playerDiscardPoint = Point("PlayerDiscard", boardGo.transform, new Vector3(-0.3f, 0.783f, -0.12f), faceUp);
+            // Pioche et défausse : piles sur la table à droite, cliquables (survol : contour orange)
+            var deckPos = new Vector3(0.44f, 0.7812f, -0.07f);
+            var discardPos = new Vector3(-0.47f, 0.7812f, -0.17f); // à gauche, vers le coin de la table côté joueuse
+            board.playerDeckPoint = Point("PlayerDeck", boardGo.transform, deckPos + Vector3.up * 0.02f, faceDown);
+            board.playerDiscardPoint = Point("PlayerDiscard", boardGo.transform, discardPos + Vector3.up * 0.02f, faceDown); // les cartes y arrivent face visible
+            foreach (var (pileName, kind, pos) in new[] { ("DrawPile", DeckPanel.Pile.Draw, deckPos), ("DiscardPile", DeckPanel.Pile.Discard, discardPos) })
+            {
+                var pg = new GameObject(pileName);
+                pg.transform.SetParent(boardGo.transform, false);
+                pg.transform.localPosition = pos;
+                pg.SetActive(false); // Awake construit la pile avec les matériaux
+                var pv = pg.AddComponent<PileView>();
+                pv.pile = kind;
+                pv.backMaterial = Mat("M_CardBack");
+                pv.frontMaterial = Mat("M_CardFront");
+                pv.highlightMaterial = Mat("M_CardHighlight");
+                pv.artLibrary = card ? card.artLibrary : null;
+                pv.cardScale = 0.065f;
+                pv.messiness = kind == DeckPanel.Pile.Draw ? 1f : 0.45f; // pioche mal rangée, défausse un peu moins
+                pg.SetActive(true);
+            }
             board.exhaustPoint = Point("Exhaust", boardGo.transform, new Vector3(0f, 0.95f, 0.05f), Quaternion.identity);
             board.playPoint = Point("PlayPoint", boardGo.transform, new Vector3(0f, 0.98f, -0.32f), Quaternion.Euler(16f, 0f, 0f));
             // Carte jouée par la Dépression : posée sur la table devant elle, plus en avant que les tiennes
@@ -533,6 +619,29 @@ namespace Lucidite.EditorTools
             board.tableCardScale = 0.065f;
             var picker = boardGo.AddComponent<CardPicker>();
             picker.playerHand = board.playerHand;
+
+            // Reliques (statuettes) et pilules posées sur la table, de chaque côté
+            var ti = boardGo.AddComponent<TableItems>();
+            ti.pillMaterial = Mat("M_Pill");
+            Transform[] Slots(string prefix, float[] xz, float yaw)
+            {
+                var r = new Transform[xz.Length / 2];
+                for (int i = 0; i < r.Length; i++)
+                    r[i] = Point($"{prefix}{i}", boardGo.transform, new Vector3(xz[i * 2], 0.7812f, xz[i * 2 + 1]), Quaternion.Euler(0f, yaw + Random.Range(-14f, 14f), 0f));
+                return r;
+            }
+            // Les statuettes de la joueuse restent sur les bords, loin de la main (sinon on les survole sans le vouloir)
+            ti.playerRelicSlots = Slots("PlayerRelic", new[] { -0.58f, -0.09f, -0.37f, -0.09f, -0.60f, -0.26f, 0.60f, -0.07f, 0.60f, 0.18f }, 0f);
+            ti.enemyRelicSlots = Slots("EnemyRelic", new[] { -0.46f, 0.34f, -0.55f, 0.26f, -0.38f, 0.41f, -0.56f, 0.39f, -0.47f, 0.22f }, 0f);
+            // Piluliers : un clic ouvre la boîte et aligne les pilules à côté (vers le centre de la table)
+            ti.playerPillBoxPoint = Point("PlayerPillBox", boardGo.transform, new Vector3(0.56f, 0.7812f, -0.22f), Quaternion.Euler(0f, -8f, 0f));
+            ti.enemyPillBoxPoint = Point("EnemyPillBox", boardGo.transform, new Vector3(0.36f, 0.7812f, 0.28f), Quaternion.Euler(0f, 180f, 0f));
+            ti.pillBoxPrefab = RelicFactory.BuildPillBox();
+
+            // Studio hors champ où tournent les statuettes de la boutique (une caméra et une texture par offre)
+            var stageGo = new GameObject("RelicStage");
+            stageGo.transform.position = new Vector3(0f, -80f, 0f);
+            stageGo.AddComponent<RelicStage>().pillMaterial = Mat("M_Pill");
 
             // Systèmes
             var systems = new GameObject("Systems");

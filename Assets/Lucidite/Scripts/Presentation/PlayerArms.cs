@@ -5,8 +5,9 @@ namespace Lucidite
 {
     /// <summary>
     /// Bras de l'étudiante en vue à la première personne.
-    /// Chaque coup encaissé fait apparaître une marque et peut faire couler un filet de sang jusqu'à la table.
-    /// Les mains tremblent de plus en plus quand la Lucidité baisse.
+    /// Chaque coup encaissé fait apparaître une marque, fait couler du sang et projette une giclée vers l'avant
+    /// sur la table, d'autant plus que le coup est fort. Les blessures restent ouvertes d'une manche à l'autre
+    /// (leur saignement suit DamageVisuals). Les mains tremblent de plus en plus quand la Lucidité baisse.
     /// </summary>
     public class PlayerArms : MonoBehaviour
     {
@@ -26,12 +27,14 @@ namespace Lucidite
 
         int _shown;
         float _tremor;
+        DamageVisuals _dv;
         Vector3 _tremorBase;
         readonly List<BloodDrip> _drips = new List<BloodDrip>();
 
         void Awake()
         {
             foreach (var w in wounds) if (w) w.SetActive(false);
+            _dv = GetComponent<DamageVisuals>();
             if (tremorRoot) _tremorBase = tremorRoot.localPosition;
         }
 
@@ -60,19 +63,26 @@ namespace Lucidite
             if (gm == null || gm.Player == null || gm.Player.maxHp <= 0) return;
             float missing = 1f - gm.Player.hp / (float)gm.Player.maxHp;
             _tremor = missing * maxTremor;
-            // Les blessures ouvertes saignent d'autant plus que la Lucidité est basse
-            foreach (var e in _emitters) if (e) e.rate = missing < 0.05f ? 0f : 0.3f + missing * 2.5f;
         }
 
         void HandleDamaged(Side side, int lost, int blocked)
         {
             if (side != Side.Player || lost <= 0) return;
-            AddWound(lost >= bleedThreshold);
+            float power = FeedbackDirector.HitPower(lost);
+            AddWound(lost >= bleedThreshold, power);
+            if (power > 0.6f) AddWound(true, power); // un coup violent ouvre une seconde plaie
+            // Giclée vers l'avant, sur la table (depuis la poitrine, juste sous la caméra)
+            var cam = Camera.main;
+            if (cam && BloodSystem.Instance)
+            {
+                var fwd = Vector3.ProjectOnPlane(cam.transform.forward, Vector3.up).normalized;
+                BloodSystem.Instance.Spray(cam.transform.position + fwd * 0.06f - Vector3.up * 0.28f, fwd, power);
+            }
         }
 
         readonly List<BloodEmitter> _emitters = new List<BloodEmitter>();
 
-        public void AddWound(bool bleed)
+        public void AddWound(bool bleed, float power = 0.3f)
         {
             int index;
             // Avec les bras importés il n'y a pas de décalcomanies de blessure : les points de saignement suffisent
@@ -92,20 +102,25 @@ namespace Lucidite
                 }
             }
             else index = Random.Range(0, Mathf.Max(1, wounds.Count));
-            if (bleed) Bleed(index);
-            else if (_emitters.Count > 0) _emitters[Random.Range(0, _emitters.Count)].Burst(3);
+            if (bleed) Bleed(index, power);
+            else if (_emitters.Count > 0) _emitters[Random.Range(0, _emitters.Count)].Burst(3 + Mathf.RoundToInt(power * 4f));
         }
 
-        void Bleed(int index)
+        void Bleed(int index, float power)
         {
-            // Gros coup : giclée de gouttes depuis la blessure
+            // Gros coup : giclée de gouttes depuis la blessure (plus ou moins selon ton saignement du moment)
+            var gm = GameManager.Instance;
+            float bleed = gm ? gm.BleedMultiplier(Side.Player) : 1f;
             if (index >= 0 && index < bleedPoints.Count && bleedPoints[index] && BloodSystem.Instance)
-                BloodSystem.Instance.Splatter(bleedPoints[index].position, 8, 0.35f);
-            foreach (var e in _emitters) if (e) e.Burst(2);
+                BloodSystem.Instance.Splatter(bleedPoints[index].position, Mathf.RoundToInt((5 + power * 16f) * bleed), 0.3f + power * 0.4f);
+            foreach (var e in _emitters) if (e) e.Burst(Mathf.RoundToInt((2 + power * 4f) * bleed));
         }
 
         void LateUpdate()
         {
+            // Les blessures ouvertes saignent selon leur gravité, y compris d'une manche à l'autre
+            float level = _dv ? _dv.Level : 0f;
+            foreach (var e in _emitters) if (e) e.rate = level < 0.1f ? 0f : 0.3f + level * 3.5f;
             if (!tremorRoot) return;
             float t = Time.time * 18f;
             tremorRoot.localPosition = _tremorBase + new Vector3(

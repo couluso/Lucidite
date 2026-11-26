@@ -19,7 +19,7 @@ namespace Lucidite.EditorTools
             ParticleDust, ParticleSmoke, Metal;
         // Matériaux v2
         public static Material Wainscot, DepressionFace, SailorGray, SleeveNavy, SleeveGray, Skirt, Blanket, Books, Cardboard,
-            Rust, CostOrb, PlayerSkin;
+            Rust, CostOrb, PlayerSkin, CardIcon, CardBonus;
 
         public static CardArtLibrary ArtLibrary;
         public static Mesh LampShadeMesh;

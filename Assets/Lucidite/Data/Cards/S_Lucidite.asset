@@ -18,6 +18,9 @@ MonoBehaviour:
   rarity: 2
   theme: 10
   flavorText: Voir les choses telles qu'elles sont.
+  icon: {fileID: 2800000, guid: ca37354eea1b53d428f720aaad43ac79, type: 3}
+  face: {fileID: 2800000, guid: 6e08ac72506c8c8429189ebac62b943d, type: 3}
+  faceUpgraded: {fileID: 2800000, guid: d431a301a1725774583ce9ef6174af41, type: 3}
   cost: 0
   unplayable: 0
   damage: 0

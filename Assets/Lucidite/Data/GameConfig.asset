@@ -17,20 +17,32 @@ MonoBehaviour:
   playerMaxLucidity: 50
   energyPerTurn: 3
   drawPerTurn: 5
-  maxHandSize: 10
-  enemyBaseHp: 42
-  enemyHpPerRound: 12
-  enemyDamageScalePerRound: 0.2
+  maxHandSize: 7
+  absoluteMaxHandSize: 12
+  enemyBaseHp: 52
+  enemyHpPerRound: 9
+  enemyDamageScalePerRound: 0.09
   enemyEnergyBase: 1
   enemyEnergyPerRound: 1
-  enemyMaxEnergy: 5
+  enemyMaxEnergy: 2
   enemyMaxCardsPerTurn: 3
-  enemyPerksPerRound: 1
+  enemyStartingBlood: 60
+  enemyBloodScale: 1
+  enemyPriceHp: 50
+  enemyPerkHp: 8
+  enemyPriceStrength: 80
+  enemyPriceBlock: 50
+  enemyPerkBlock: 6
+  enemyPriceSharpen: 55
+  enemyPerkSharpen: 0.25
+  enemyPriceNewMove: 70
+  enemyPriceEnergy: 150
+  enemyMaxBonusEnergy: 1
   startingBlood: 60
-  rewardRoundWin: 80
-  rewardRoundLoss: 50
-  lucidityPerBonusBlood: 2
-  bloodPerDamage: 0.6
+  rewardRoundWin: 60
+  rewardRoundLoss: 25
+  lucidityPerBonusBlood: 0
+  bloodPerDamage: 1
   cardOffers: 3
   priceCommon: 45
   priceUncommon: 70
@@ -39,7 +51,13 @@ MonoBehaviour:
   removeCostBase: 60
   removeCostIncrease: 25
   transformCost: 4
-  relicSlots: 3
+  serviceCostIncrease: 25
+  rerollCost: 10
+  rerollCostIncrease: 5
+  pillOffers: 3
+  relicOffers: 2
+  suitLevelBonus: 2
+  relicSlots: 5
   itemSlots: 3
   enemyActDelay: 0.6
   cardResolveDelay: 0.25

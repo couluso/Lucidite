@@ -16,6 +16,8 @@ MonoBehaviour:
   arcana: XXI
   theme: 2
   flavorText: "\xAB \xC0 quoi bon ? \xBB"
+  icon: {fileID: 2800000, guid: a7c9b956fe154ef479499de3ec0cafaa, type: 3}
+  face: {fileID: 2800000, guid: d7e3ac24465cd8b4cbbe1f949f9b6b91, type: 3}
   damage: 0
   hits: 1
   block: 10

@@ -16,6 +16,8 @@ MonoBehaviour:
   arcana: XV
   theme: 1
   flavorText: "Une voix basse qui sait exactement o\xF9 appuyer."
+  icon: {fileID: 2800000, guid: 1b58921193ecde44193c7fe72d1b23c1, type: 3}
+  face: {fileID: 2800000, guid: 0751681b249c4ef48a485d7db82e068b, type: 3}
   damage: 3
   hits: 1
   block: 0

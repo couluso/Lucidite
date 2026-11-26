@@ -18,6 +18,9 @@ MonoBehaviour:
   rarity: 1
   theme: 10
   flavorText: "Mettre des mots, c'est d\xE9j\xE0 les tenir \xE0 distance."
+  icon: {fileID: 2800000, guid: 39a37b009cb2a064aae5a12b27931a97, type: 3}
+  face: {fileID: 2800000, guid: a7b473af1c768b0488d858b2923c49c5, type: 3}
+  faceUpgraded: {fileID: 0}
   cost: 1
   unplayable: 0
   damage: 0

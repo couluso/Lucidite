@@ -39,6 +39,63 @@ MonoBehaviour:
     texture: {fileID: 2800000, guid: 46e2702df4890c14ea2ba0349c59f20d, type: 3}
   - theme: 12
     texture: {fileID: 2800000, guid: 09d16d81a8178ce439876684ca355238, type: 3}
+  faceAttack: {fileID: 2800000, guid: 73fee84491713c6488dd33ac94b60cb7, type: 3}
+  faceDefense: {fileID: 2800000, guid: 2ef46dda867032c479cce7e960227de2, type: 3}
+  faceTorment: {fileID: 2800000, guid: 0807eb436a69e304297fc2280a6e5e81, type: 3}
+  faceCrisis: {fileID: 2800000, guid: e653ef2b582fe7c4284f7cc61ca82c9a, type: 3}
+  faceEnemy: {fileID: 2800000, guid: 0371e198312600940b7d31bf4c745a48, type: 3}
+  orb: {fileID: 2800000, guid: 565e550b8026f134b9530252b53c7195, type: 3}
+  iconFallback: {fileID: 2800000, guid: 0e99bb4317780ee45beb98ec9aecd95a, type: 3}
+  statIcons:
+  - stat: 0
+    texture: {fileID: 2800000, guid: 9251d39a3b4653146bcd7d419cc962c7, type: 3}
+  - stat: 1
+    texture: {fileID: 2800000, guid: baae4573c41f2e9459b183a7b3b18921, type: 3}
+  - stat: 2
+    texture: {fileID: 2800000, guid: 0f6644fce6070e142ba1bfefecdee98a, type: 3}
+  - stat: 3
+    texture: {fileID: 2800000, guid: 6c029f33c44cccc46af4657b133e3b63, type: 3}
+  - stat: 4
+    texture: {fileID: 2800000, guid: 0439c9c388bb47b408c8eda708ee8bf3, type: 3}
+  - stat: 5
+    texture: {fileID: 2800000, guid: 412e1e0657cf06044a90f254cd152679, type: 3}
+  - stat: 6
+    texture: {fileID: 2800000, guid: 1ade2d17d69dbbf4db7e346f42762146, type: 3}
+  - stat: 7
+    texture: {fileID: 2800000, guid: f38626fd5a1ab0a47b4089508d63dd1a, type: 3}
+  - stat: 8
+    texture: {fileID: 2800000, guid: c38b57aad9320684899b46b2159a3a61, type: 3}
+  - stat: 9
+    texture: {fileID: 2800000, guid: 166950e31c6f43742a77b409db6992ea, type: 3}
+  - stat: 10
+    texture: {fileID: 2800000, guid: ea05954eb4b74194cb64784bf1c03377, type: 3}
+  - stat: 11
+    texture: {fileID: 2800000, guid: edba6441cc833d847858b98197551a60, type: 3}
+  - stat: 12
+    texture: {fileID: 2800000, guid: b0cef1647f4da084b8df883a22b22b4a, type: 3}
+  - stat: 13
+    texture: {fileID: 2800000, guid: 53e7247987a1a5d47bc0f674d67401a9, type: 3}
+  - stat: 14
+    texture: {fileID: 2800000, guid: 8eaf47a3d1b83554497bd8a589c3dc4d, type: 3}
+  - stat: 15
+    texture: {fileID: 2800000, guid: 842a9379b58137840b11cdaacb3f973a, type: 3}
+  cardBlood:
+  - {fileID: 2800000, guid: 51e8f867082e9034b937fd9bc4685fb7, type: 3}
+  - {fileID: 2800000, guid: df9297b4747e9584ba13010c48a9b55b, type: 3}
+  - {fileID: 2800000, guid: 6bb9f15604cc65d4b92ad2793932eaf6, type: 3}
+  - {fileID: 2800000, guid: 93a6cee3f4cf5f14eac624bf5a302660, type: 3}
+  suitOverlays:
+  - {fileID: 0}
+  - {fileID: 2800000, guid: b42a449abdafaca4db5b4322b44790dd, type: 3}
+  - {fileID: 2800000, guid: 8bb68e69b7941334fb5d015f8c7d0755, type: 3}
+  - {fileID: 2800000, guid: 557d726f4d0dd2e48824fdb2fa95079a, type: 3}
+  - {fileID: 2800000, guid: aca74e82640903a4eb87727bebfbdbb7, type: 3}
+  suitIcons:
+  - {fileID: 0}
+  - {fileID: 2800000, guid: 6a54c362207d26f4ca741c6be5a5896c, type: 3}
+  - {fileID: 2800000, guid: d1320450d04663945b8e44909e900050, type: 3}
+  - {fileID: 2800000, guid: b357a1b49a0e947489ab34909ba04ec2, type: 3}
+  - {fileID: 2800000, guid: d47f2cdeca518e244baf434ca3a18120, type: 3}
   fallback: {fileID: 2800000, guid: a2b1ff311f0fbe94fa778d3b2a774b22, type: 3}
   cardBack: {fileID: 2800000, guid: 073731b296564dc44bae45266f9eaf6f, type: 3}
   bloodDropIcon: {fileID: 2800000, guid: 813b9e24796a94a4a991f6fc9f8f18a5, type: 3}

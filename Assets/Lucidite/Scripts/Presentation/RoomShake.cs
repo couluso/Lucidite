@@ -6,8 +6,9 @@ namespace Lucidite
     /// <summary>
     /// Fait trembler toute la pièce comme si elle était en train d'être détruite :
     /// secousse de la racine "Environment", objets qui s'entrechoquent et restent de travers,
-    /// gravats qui tombent du plafond (et restent au sol), fissures qui apparaissent sur les murs et le plafond,
-    /// la lampe qui part en balancier. Tout reste en place jusqu'à la fin de la partie.
+    /// gravats qui tombent du plafond (et restent au sol), pluie de poussière, craquements et chocs des gravats,
+    /// fissures qui apparaissent sur les murs et le plafond, la lampe qui part en balancier.
+    /// Tout reste en place jusqu'à la fin de la partie.
     /// </summary>
     public class RoomShake : MonoBehaviour
     {
@@ -25,6 +26,8 @@ namespace Lucidite
         public Vector3 ceilingCenter = new Vector3(0, 2.62f, 0.2f);
         public Vector2 ceilingHalfSize = new Vector2(1.9f, 1.9f);
         public int maxDebris = 140;
+        [Tooltip("Poussière qui tombe du plafond à chaque secousse destructrice (quantité selon la force).")]
+        public ParticleSystem ceilingDust;
         [Tooltip("Fissures cachées, révélées au fil des coups.")]
         public List<GameObject> cracks = new List<GameObject>();
         [Tooltip("Objets qui s'entrechoquent (remplis automatiquement si vide).")]
@@ -87,14 +90,40 @@ namespace Lucidite
                     r.drift = Vector3.ClampMagnitude(r.drift + Random.insideUnitSphere * amount * 4f, 7f);
 
             SpawnDebris(Mathf.RoundToInt(4 + amount * 14));
+            if (ceilingDust)
+            {
+                // Pluie fine sur toute la pièce + quelques coulées denses là où le plafond lâche
+                ceilingDust.Emit(Mathf.RoundToInt(40 + amount * 160));
+                EmitDustStreams(Mathf.RoundToInt(2 + amount * 5));
+            }
             _damageAccum += amount;
+            bool cracked = false;
             while (_damageAccum >= 0.8f && _cracksShown < cracks.Count)
             {
                 _damageAccum -= 0.8f;
                 var c = cracks[_cracksShown++];
-                if (c) c.SetActive(true);
+                if (c) { c.SetActive(true); cracked = true; }
             }
             AudioManager.Play(Sfx.Rumble, 0.5f + amount * 0.5f);
+            // Plâtre qui craque et s'effrite (plus fort quand une fissure s'ouvre)
+            AudioManager.Play(Sfx.Crumble, Mathf.Clamp01(0.35f + amount * 0.5f + (cracked ? 0.3f : 0f)));
+        }
+
+        /// <summary>Coulées de poussière : un filet dense qui s'échappe d'un point du plafond.</summary>
+        void EmitDustStreams(int streams)
+        {
+            var ep = new ParticleSystem.EmitParams { applyShapeToPosition = false };
+            for (int s = 0; s < streams; s++)
+            {
+                var origin = transform.TransformPoint(ceilingCenter + new Vector3(Random.Range(-ceilingHalfSize.x, ceilingHalfSize.x), -0.01f, Random.Range(-ceilingHalfSize.y, ceilingHalfSize.y)));
+                int n = Random.Range(18, 40);
+                for (int i = 0; i < n; i++)
+                {
+                    ep.position = origin + new Vector3(Random.Range(-0.05f, 0.05f), Random.Range(-0.02f, 0f), Random.Range(-0.05f, 0.05f));
+                    ep.velocity = new Vector3(Random.Range(-0.03f, 0.03f), -Random.Range(0.05f, 0.6f), Random.Range(-0.03f, 0.03f));
+                    ceilingDust.Emit(ep, 1);
+                }
+            }
         }
 
         void SpawnDebris(int count)
@@ -107,14 +136,15 @@ namespace Lucidite
                     if (_debris[0]) Destroy(_debris[0]);
                     _debris.RemoveAt(0);
                 }
-                var g = GameObject.CreatePrimitive(Random.value < 0.7f ? PrimitiveType.Cube : PrimitiveType.Sphere);
+                // Éclats de plâtre / de bois : des cubes plus ou moins aplatis (plus de sphères)
+                var g = GameObject.CreatePrimitive(PrimitiveType.Cube);
                 g.name = "Debris";
                 g.layer = 2; // Ignore Raycast : ne bloque pas le survol des cartes
                 g.transform.SetParent(transform, true);
                 g.transform.position = transform.TransformPoint(ceilingCenter + new Vector3(Random.Range(-ceilingHalfSize.x, ceilingHalfSize.x), 0f, Random.Range(-ceilingHalfSize.y, ceilingHalfSize.y)));
                 g.transform.rotation = Random.rotation;
-                float s = Random.Range(0.012f, 0.06f);
-                g.transform.localScale = new Vector3(s, s * Random.Range(0.3f, 1f), s * Random.Range(0.5f, 1.3f));
+                float s = Random.Range(0.018f, 0.075f);
+                g.transform.localScale = new Vector3(s, s * Random.Range(0.25f, 0.9f), s * Random.Range(0.5f, 1.4f));
                 var mr = g.GetComponent<MeshRenderer>();
                 mr.sharedMaterial = debrisMaterials[Random.Range(0, debrisMaterials.Length)];
                 var rb = g.AddComponent<Rigidbody>();
@@ -122,7 +152,25 @@ namespace Lucidite
                 rb.linearDamping = 0.2f;
                 rb.angularVelocity = Random.insideUnitSphere * 8f;
                 rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+                g.AddComponent<DebrisSound>();
                 _debris.Add(g);
+            }
+        }
+
+        /// <summary>Petit choc sonore quand un gravat heurte la table ou le sol (les premiers rebonds seulement).</summary>
+        class DebrisSound : MonoBehaviour
+        {
+            static float s_last;
+            int _hits;
+
+            void OnCollisionEnter(Collision c)
+            {
+                if (_hits >= 3) return;
+                float v = c.relativeVelocity.magnitude;
+                if (v < 0.5f || Time.time - s_last < 0.025f) return; // évite la saturation quand tout tombe en même temps
+                s_last = Time.time;
+                _hits++;
+                AudioManager.Play(Sfx.DebrisHit, Mathf.Clamp01(v / 4f) * (_hits == 1 ? 0.55f : 0.3f));
             }
         }
 

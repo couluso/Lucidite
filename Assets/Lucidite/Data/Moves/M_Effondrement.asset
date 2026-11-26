@@ -16,6 +16,8 @@ MonoBehaviour:
   arcana: XIX
   theme: 2
   flavorText: "Tout l\xE2che en m\xEAme temps."
+  icon: {fileID: 2800000, guid: 8c794c807183fa74fac93978fae76141, type: 3}
+  face: {fileID: 2800000, guid: 82f4fbca3238698449f4471716651e8d, type: 3}
   damage: 22
   hits: 1
   block: 0

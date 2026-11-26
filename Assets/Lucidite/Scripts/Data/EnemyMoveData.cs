@@ -13,6 +13,10 @@ namespace Lucidite
         public string arcana = "XV";
         public CardTheme theme = CardTheme.Depression;
         [TextArea(2, 4)] public string flavorText = "";
+        [Tooltip("Grande icône centrale de la carte. Générée par l'outil de setup.")]
+        public Texture2D icon;
+        [Tooltip("Face complète de la carte. Générée par l'outil de setup.")]
+        public Texture2D face;
 
         [Header("Effets")]
         public int damage;

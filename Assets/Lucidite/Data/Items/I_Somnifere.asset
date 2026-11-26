@@ -14,8 +14,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Lucidite.ItemData
   itemName: "Somnif\xE8re"
   kind: 1
-  effect: 10
+  effect: 22
   value: 3
   price: 45
   flavorText: Oublier, recommencer.
   tint: {r: 0.5568628, g: 0.5411765, b: 0.5254902, a: 1}
+  model: {fileID: 0}
+  enemyCanBuy: 0
+  rare: 0

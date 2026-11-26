@@ -18,6 +18,9 @@ MonoBehaviour:
   rarity: 1
   theme: 3
   flavorText: Juste cinq minutes de plus.
+  icon: {fileID: 2800000, guid: e392b7f7fb3d66748879f7d6f500edda, type: 3}
+  face: {fileID: 2800000, guid: e48b920ba8259ec4aba60c54981eb3ce, type: 3}
+  faceUpgraded: {fileID: 0}
   cost: 0
   unplayable: 0
   damage: 0

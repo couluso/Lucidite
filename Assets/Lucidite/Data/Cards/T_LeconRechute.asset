@@ -13,11 +13,14 @@ MonoBehaviour:
   m_Name: T_LeconRechute
   m_EditorClassIdentifier: Assembly-CSharp::Lucidite.CardData
   cardName: "Le\xE7on de la rechute"
-  arcana: VI
+  arcana: XVIII
   type: 1
   rarity: 2
   theme: 11
   flavorText: Tomber n'efface pas le chemin parcouru.
+  icon: {fileID: 2800000, guid: 8de0ead581dc0a043876fd0a34c65810, type: 3}
+  face: {fileID: 2800000, guid: 9daac06e7d5621e4392b4a341e9cc5a5, type: 3}
+  faceUpgraded: {fileID: 0}
   cost: 1
   unplayable: 0
   damage: 0

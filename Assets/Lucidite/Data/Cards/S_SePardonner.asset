@@ -18,6 +18,9 @@ MonoBehaviour:
   rarity: 3
   theme: 4
   flavorText: Tu as fait de ton mieux avec ce que tu avais.
+  icon: {fileID: 2800000, guid: 487fb339e4dbcf34182f71992d3975fe, type: 3}
+  face: {fileID: 2800000, guid: 01d988f2d13cb794bb9f6cba2f8b2646, type: 3}
+  faceUpgraded: {fileID: 2800000, guid: 4cf4548d46cf9f64587c995d11933569, type: 3}
   cost: 0
   unplayable: 0
   damage: 0

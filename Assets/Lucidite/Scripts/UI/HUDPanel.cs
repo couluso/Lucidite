@@ -25,6 +25,7 @@ namespace Lucidite
 
         [Header("Tour")]
         public Button endTurnButton;
+        public Button sortButton;
         public TMP_Text endTurnLabel;
         public Button drawPileButton;
         public Button discardPileButton;
@@ -81,6 +82,7 @@ namespace Lucidite
 
             bool canAct = gm.CanAct;
             if (endTurnButton) endTurnButton.interactable = canAct;
+            if (sortButton) sortButton.interactable = canAct && p.hand.Count > 1;
             if (endTurnLabel)
             {
                 bool nothingPlayable = canAct && (gm.Selected.Count > 0 || !p.hand.Exists(c => gm.IsPlayable(c, out _)));

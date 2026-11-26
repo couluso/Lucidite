@@ -7,10 +7,14 @@ namespace Lucidite
     /// <summary>
     /// Réactions audio-visuelles. Encaisser une attaque : la pièce tremble (ce qui balance la lampe),
     /// la caméra est secouée, l'image VHS grésille, les bords rougissent, de la poussière tombe.
-    /// L'intensité suit la quantité de Lucidité perdue.
+    /// L'intensité suit la quantité de Lucidité perdue (HitPower), dans les deux sens : un gros coup porté
+    /// à la Dépression secoue aussi la pièce.
     /// </summary>
     public class FeedbackDirector : MonoBehaviour
     {
+        /// <summary>Puissance d'un coup (0 à 1) d'après la vie perdue : ~0.3 pour 6, ~0.85 pour 17, 1 à partir de 20.</summary>
+        public static float HitPower(int lost) => Mathf.Clamp01(lost / 20f);
+
         public CameraRig cameraRig;
         public HangingLamp lamp;
         public RoomShake roomShake;
@@ -72,26 +76,31 @@ namespace Lucidite
             if (side == Side.Player)
             {
                 if (lost <= 0) { AudioManager.Play(Sfx.Blocked); if (cameraRig) cameraRig.AddTrauma(0.15f); return; }
-                float k = Mathf.Clamp01(lost / 14f);
-                if (roomShake) roomShake.Shake(0.55f + k * 0.65f);
-                else if (lamp) { lamp.Impulse(20f + 25f * k); lamp.FlickerBurst(0.6f); }
-                if (cameraRig) { cameraRig.AddTrauma(0.45f + k * 0.5f); cameraRig.Jolt(0.45f + k * 0.55f); }
-                if (PSXScreen.Instance) { PSXScreen.Instance.AddGlitch(0.6f + k * 0.9f); PSXScreen.Instance.Flash(Palette.BloodLight, 0.25f + k * 0.35f); }
-                if (ceilingDust) ceilingDust.Play();
-                _pulse = Mathf.Max(_pulse, 0.5f + k * 0.5f);
-                AudioManager.Play(Sfx.Damage, 0.6f + k * 0.4f);
-                AudioManager.Play(Sfx.Static, 0.5f + k * 0.4f);
+                float k = HitPower(lost);
+                float k2 = k * k; // les très gros coups ressortent nettement
+                if (roomShake) roomShake.Shake(0.3f + k * 0.5f + k2 * 0.5f);
+                else if (lamp) { lamp.Impulse(15f + 35f * k); lamp.FlickerBurst(0.4f + k); }
+                if (cameraRig) { cameraRig.AddTrauma(0.3f + k * 0.4f + k2 * 0.3f); cameraRig.Jolt(0.3f + k * 0.5f + k2 * 0.5f); }
+                if (PSXScreen.Instance) { PSXScreen.Instance.AddGlitch(0.4f + k * 0.8f + k2 * 0.6f); PSXScreen.Instance.Flash(Palette.BloodLight, 0.2f + k * 0.45f); }
+                if (ceilingDust && !roomShake && k > 0.25f) ceilingDust.Play(); // sinon RoomShake s'en charge
+                _pulse = Mathf.Max(_pulse, 0.4f + k * 0.6f);
+                AudioManager.Play(Sfx.Damage, 0.5f + k * 0.5f);
+                AudioManager.Play(Sfx.Static, 0.4f + k * 0.5f);
                 if (k > 0.4f || gm.Player.IsLowLucidity) AudioManager.Play(Sfx.Heartbeat);
-                if (k > 0.35f) StartCoroutine(HitStop(0.05f + k * 0.08f));
+                if (k > 0.35f) StartCoroutine(HitStop(0.04f + k2 * 0.12f));
             }
             else
             {
                 if (lost <= 0) return;
-                float k = Mathf.Clamp01(lost / 14f);
-                if (cameraRig) cameraRig.AddTrauma(0.1f + k * 0.15f);
-                if (PSXScreen.Instance) PSXScreen.Instance.AddGlitch(0.15f + k * 0.2f);
-                if (lamp) lamp.Impulse(4f + 6f * k);
-                AudioManager.Play(Sfx.OpponentHurt, 0.4f + k * 0.5f);
+                float k = HitPower(lost);
+                float k2 = k * k;
+                // Moins fort que quand c'est toi qui encaisses, mais un gros coup fait trembler la pièce
+                if (roomShake && k > 0.25f) roomShake.Shake(0.1f + k2 * 0.55f, k > 0.6f);
+                else if (lamp) lamp.Impulse(4f + 10f * k);
+                if (cameraRig) { cameraRig.AddTrauma(0.1f + k * 0.2f + k2 * 0.25f); if (k > 0.4f) cameraRig.Jolt(k2 * 0.45f); }
+                if (PSXScreen.Instance) PSXScreen.Instance.AddGlitch(0.1f + k * 0.25f + k2 * 0.3f);
+                AudioManager.Play(Sfx.OpponentHurt, 0.4f + k * 0.6f);
+                if (k > 0.6f) StartCoroutine(HitStop(0.03f + k2 * 0.07f));
             }
         }
 

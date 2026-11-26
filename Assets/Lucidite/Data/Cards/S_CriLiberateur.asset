@@ -18,6 +18,9 @@ MonoBehaviour:
   rarity: 2
   theme: 11
   flavorText: "Et apr\xE8s, le silence est plus l\xE9ger."
+  icon: {fileID: 2800000, guid: 9205efe18fe7a7044bd6ba8cd70b4827, type: 3}
+  face: {fileID: 2800000, guid: 73510e0ea1493bd438ed93c46d20ef4b, type: 3}
+  faceUpgraded: {fileID: 0}
   cost: 0
   unplayable: 0
   damage: 9

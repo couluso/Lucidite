@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using UnityEditor;
 using UnityEngine;
 using static Lucidite.EditorTools.AssetFactory;
@@ -25,6 +26,7 @@ namespace Lucidite.EditorTools
                 d = LoadOrCreate<CardData>($"{CardDir}/{id}.asset");
                 s_paths.Add($"{CardDir}/{id}.asset");
                 d.cardName = name; d.type = type; d.rarity = rarity; d.theme = theme; d.cost = cost; d.flavorText = flavor;
+                d.icon = CardFaceFactory.SaveIcon(id); // grande icône unique, dessinée par carte
                 d.arcana = Roman[s_arcana++ % Roman.Length];
                 d.unplayable = false;
                 d.damage = 0; d.hits = 1; d.block = 0; d.draw = 0; d.energyGain = 0; d.heal = 0;
@@ -60,6 +62,7 @@ namespace Lucidite.EditorTools
         {
             var m = LoadOrCreate<EnemyMoveData>($"{DataDir}/Moves/{id}.asset");
             m.moveName = name; m.arcana = arcana; m.theme = theme; m.flavorText = flavor;
+            m.icon = CardFaceFactory.SaveIcon(id);
             m.damage = 0; m.hits = 1; m.block = 0; m.strengthGain = 0; m.applyWeak = 0; m.applyVulnerable = 0;
             m.crisisCount = 0; m.crisisToDrawPile = false; m.specificCrisis = null;
             m.minRound = minRound; m.weight = weight;
@@ -68,12 +71,15 @@ namespace Lucidite.EditorTools
             return m;
         }
 
-        static ItemData Item(string id, string name, ItemKind kind, ItemEffect effect, int value, int price, string hexTint, string flavor)
+        static ItemData Item(string id, string name, ItemKind kind, ItemEffect effect, int value, int price, string hexTint, string flavor, bool her = false, bool rare = false)
         {
             var i = LoadOrCreate<ItemData>($"{ItemDir}/{id}.asset");
             s_paths.Add($"{ItemDir}/{id}.asset");
             i.itemName = name; i.kind = kind; i.effect = effect; i.value = value; i.price = price;
             i.tint = Palette.Hex(hexTint); i.flavorText = flavor;
+            i.enemyCanBuy = her;
+            i.rare = rare;
+            i.model = kind == ItemKind.Relique ? RelicFactory.Build(id) : null; // chaque relique a sa statuette
             EditorUtility.SetDirty(i);
             return i;
         }
@@ -82,20 +88,75 @@ namespace Lucidite.EditorTools
         {
             var cfg = LoadOrCreate<GameConfig>($"{DataDir}/GameConfig.asset");
             // Économie (réécrite à chaque setup : l'ancienne était trop pauvre)
+            // Main : les cartes non jouées restent ; la pioche normale s'arrête à 7, les pioches bonus vont au-delà (12 max)
+            cfg.drawPerTurn = 5;
+            cfg.maxHandSize = 7;
+            cfg.absoluteMaxHandSize = 12;
             cfg.startingBlood = 60;
-            cfg.rewardRoundWin = 80;
-            cfg.rewardRoundLoss = 50;
-            cfg.lucidityPerBonusBlood = 2;
-            cfg.bloodPerDamage = 0.6f;
-            // Dépression : énergie croissante (1, 2, 3, 4, 5) et renforcements entre les manches
+            // Gouttes : une base (faible en cas de défaite) + un bonus selon le sang que tu as fait couler chez la Dépression
+            cfg.rewardRoundWin = 60;
+            cfg.rewardRoundLoss = 25;
+            cfg.lucidityPerBonusBlood = 0;
+            cfg.bloodPerDamage = 1f;
+            // Boutique : services répétables (+25 à chaque usage, remis à zéro à la boutique suivante), relance 10 puis +5
+            cfg.serviceCostIncrease = 25;
+            cfg.rerollCost = 10; cfg.rerollCostIncrease = 5;
+            cfg.pillOffers = 3; cfg.relicOffers = 2;
+            cfg.relicSlots = 5; cfg.itemSlots = 3;
+            // Classes : chaque niveau ajoute +2 aux dégâts / bouclier / soin des cartes de la classe
+            cfg.suitLevelBonus = 2;
+            // Dépression : énergie 1 puis 2 (3 si elle l'achète), progression douce entre les manches
+            // (équilibrage simulé, main conservée entre les tours : ~20 % de victoires pour une joueuse IA naïve ; à 40 %, une vraie joueuse gagnait 3-0)
+            cfg.enemyBaseHp = 52;
+            cfg.enemyHpPerRound = 9;
+            cfg.enemyDamageScalePerRound = 0.09f;
             cfg.enemyEnergyBase = 1;
             cfg.enemyEnergyPerRound = 1f;
-            cfg.enemyMaxEnergy = 5;
+            cfg.enemyMaxEnergy = 2;
             cfg.enemyMaxCardsPerTurn = 3;
-            cfg.enemyPerksPerRound = 1;
+            // Sa boutique : mêmes gains de gouttes que la joueuse, achats secrets
+            cfg.enemyStartingBlood = 60;
+            cfg.enemyBloodScale = 1f;
+            cfg.enemyPriceHp = 50; cfg.enemyPerkHp = 8;
+            cfg.enemyPriceStrength = 80;
+            cfg.enemyPriceBlock = 50; cfg.enemyPerkBlock = 6;
+            cfg.enemyPriceSharpen = 55; cfg.enemyPerkSharpen = 0.25f;
+            cfg.enemyPriceNewMove = 70;
+            cfg.enemyPriceEnergy = 150; cfg.enemyMaxBonusEnergy = 1;
             EditorUtility.SetDirty(cfg);
             AssetDatabase.SaveAssetIfDirty(cfg);
             return cfg;
+        }
+
+        /// <summary>Faces des cartes : icône et bonus cuits dans la texture (après que tous les effets sont définis).</summary>
+        static void BuildFaces(CardDatabase db)
+        {
+            var stats = new List<CardStat>();
+            var up = new List<CardStat>();
+            foreach (var p in s_paths)
+            {
+                var d = AssetDatabase.LoadAssetAtPath<CardData>(p);
+                if (!d) continue;
+                var c = new CardInstance(d);
+                CardFace.Stats(c, stats);
+                d.face = CardFaceFactory.SaveFace(d.name, d.name, Palette.ForType(d.type), false, stats);
+                d.faceUpgraded = null;
+                if (d.evolvesInto == null && c.CanUpgrade)
+                {
+                    c.upgraded = true;
+                    CardFace.Stats(c, up);
+                    if (!stats.SequenceEqual(up)) d.faceUpgraded = CardFaceFactory.SaveFace(d.name + "_plus", d.name, Palette.ForType(d.type), false, up);
+                }
+                EditorUtility.SetDirty(d);
+            }
+            foreach (var m in db.enemyMoves)
+            {
+                var it = new EnemyIntent { move = m, damagePerHit = m.damage, hits = m.hits, block = m.block, strength = m.strengthGain,
+                    weak = m.applyWeak, vulnerable = m.applyVulnerable, crisis = m.crisisCount };
+                CardFace.Stats(it, stats);
+                m.face = CardFaceFactory.SaveFace(m.name, m.name, Palette.TypeEnemy, true, stats);
+                EditorUtility.SetDirty(m);
+            }
         }
 
         public static CardDatabase BuildDatabase()
@@ -137,6 +198,20 @@ namespace Lucidite.EditorTools
             var cafe = new C("S_SecondSouffle", "Second souffle", T, U, CardTheme.Resilience, 1, "Encore un peu d'élan.").Energy(2).Exhaust(true).d;
             var pardonner = new C("S_SePardonner", "Se pardonner", T, R, CardTheme.Culpabilite, 0, "Tu as fait de ton mieux avec ce que tu avais.").Special(CardSpecial.PurgerCrisesEnMain).Draw(0, 1).d;
 
+            // ---------------------------------------------------------- Classes et saignement
+            var battements = new C("S_Battements", "Battements", A, Co, CardTheme.Anxiete, 1, "Boum. Boum. Plus vite à chaque carte de sa classe.").Dmg(4, 1).Special(CardSpecial.CoupsParClasse).d;
+            var souffleCourt = new C("S_SouffleCourt", "Souffle court", D, Co, CardTheme.Anxiete, 0, "Petites goulées, mais de l'air quand même.").Blk(4, 2).Draw(1).d;
+            var regardNoir = new C("S_RegardNoir", "Regard noir", A, Co, CardTheme.Culpabilite, 1, "Pour une fois, c'est elle qui baisse les yeux.").Dmg(5, 2).Vuln(1).Magic(1).d;
+            var gorge = new C("S_GorgeNouee", "Gorge nouée", T, Co, CardTheme.Anxiete, 1, "Les mots restent coincés. Les siens aussi.").Weak(2).Magic(1).Draw(1).d;
+            var mainTendue = new C("S_MainTendue", "Main tendue", D, U, CardTheme.Soutien, 1, "Quelqu'un est là, même sans rien dire.").Blk(5, 2).Special(CardSpecial.BouclierParClasseEnMain, 3).Magic(1).d;
+            var apnee = new C("S_Apnee", "Apnée", D, U, CardTheme.VideSolitude, 2, "Sous l'eau, plus rien ne crie.").Blk(11, 3).Draw(2).d;
+            var hemorragie = new C("S_Hemorragie", "Hémorragie", A, U, CardTheme.Traumatismes, 2, "Ça ne s'arrête plus de couler. Chez elle, pour une fois.").Dmg(12, 4).Special(CardSpecial.SaignementAdverseTour).d;
+            var garrot = new C("S_Garrot", "Garrot", D, Co, CardTheme.Resilience, 1, "Serrer fort, le temps que ça passe.").Blk(6, 3).Special(CardSpecial.SaignementReduitTour).d;
+            var transfusion = new C("S_Transfusion", "Transfusion", T, U, CardTheme.Soutien, 1, "Le sang des autres, pour continuer.").Special(CardSpecial.SoinSelonSang, 2).Magic(2).Exhaust(true).d;
+            var palpitations = new C("S_Palpitations", "Palpitations", T, Co, CardTheme.Anxiete, 0, "Ça cogne trop fort, mais ça pousse en avant.").Special(CardSpecial.PerdreLucidite, 3).Energy(1).Draw(1, 1).d;
+            var saignerBlanc = new C("S_SaignerABlanc", "Saigner à blanc", A, R, CardTheme.Desespoir, 1, "Quand tout est rouge, frapper deux fois plus fort.").Dmg(9, 3).Special(CardSpecial.DoubleSiEcarlate).d;
+            var echo = new C("S_Echo", "Écho", T, R, CardTheme.Espoir, 1, "Elle résonne avec tout ce que tu es.").Special(CardSpecial.Joker).Draw(1, 1).d;
+
             // ---------------------------------------------------------- Crises et leurs transformations
             var doute = new C("C_Doute", "Doute", K, Cr, CardTheme.Anxiete, 0, "Et si tu n'y arrivais jamais ?").Unplayable().Ethereal().d;
             var rechute = new C("C_Rechute", "Rechute", K, Cr, CardTheme.Depression, 0, "Tu croyais que c'était fini.").Unplayable().Held(3).d;
@@ -177,32 +252,72 @@ namespace Lucidite.EditorTools
             var mIsolement = Move("M_Isolement", "Isolement", "II", CardTheme.VideSolitude, "Ton téléphone ne sonne plus. Tu ne l'allumes plus.", 2, 0.8f);
             mIsolement.block = 14; mIsolement.strengthGain = 1; mIsolement.cost = 1; mIsolement.shopOnly = true;
 
-            // ---------------------------------------------------------- Objets
+            // ---------------------------------------------------------- Reliques (statuettes posées sur la table) et pilules
+            // her = la Dépression peut l'acheter aussi (posée de son côté de la table)
             var items = new List<ItemData>
             {
-                Item("R_PhotoFamille", "Photo de famille", ItemKind.Relique, ItemEffect.BouclierDebutManche, 8, 140, "C9BFAE", "Des sourires d'avant. Ils existent encore."),
-                Item("R_BraceletHopital", "Bracelet d'hôpital", ItemKind.Relique, ItemEffect.LuciditeMax, 10, 130, "8E8A86", "Tu es déjà passée par là. Tu en es sortie."),
-                Item("R_CarnetIntime", "Carnet intime", ItemKind.Relique, ItemEffect.PiocheDebutManche, 2, 140, "5B3A1E", "Chaque page lue à voix basse te rend plus lucide."),
-                Item("R_Pendentif", "Pendentif de grand-mère", ItemKind.Relique, ItemEffect.ForceDebutManche, 1, 150, "D9A441", "« Tu es plus forte que tu ne le crois. »"),
-                Item("R_Peluche", "Chat en peluche", ItemKind.Relique, ItemEffect.EnergiePremierTour, 1, 150, "4A4644", "Un œil en moins, mais toujours là."),
-                Item("R_Tirelire", "Tirelire fêlée", ItemKind.Relique, ItemEffect.GouttesBonus, 15, 110, "6E0B0E", "Garder un peu pour plus tard."),
-                Item("R_TicketBus", "Ticket de bus usé", ItemKind.Relique, ItemEffect.RemiseBoutique, 20, 120, "3A3E4A", "Pour partir, n'importe où, un jour."),
-                Item("I_Tisane", "Tisane", ItemKind.Consommable, ItemEffect.GagnerBouclier, 12, 50, "5A4130", "Chaude entre les mains."),
-                Item("I_CafeFroid", "Café froid", ItemKind.Consommable, ItemEffect.GagnerEnergie, 2, 55, "3B2A1E", "Amer, mais ça réveille."),
-                Item("I_LettreAmie", "Lettre d'une amie", ItemKind.Consommable, ItemEffect.Soigner, 15, 55, "C9BFAE", "« Je pense fort à toi. »"),
+                Item("R_Pleureuse", "La Pleureuse", ItemKind.Relique, ItemEffect.SaignementAdverse, 2, 125, "A9A397", "Elle pleure pour toi, à genoux, des larmes rouges. Ton adversaire saigne deux fois plus.", true),
+                Item("R_ClocheCoeur", "Cloche au cœur", ItemKind.Relique, ItemEffect.ResonanceFacile, (int)CardSuit.Coeur, 90, "8E2A26", "Sous le verre, il bat encore. Tout ce qu'on entend, c'est lui."),
+                Item("R_ClochePoumons", "Cloche aux poumons", ItemKind.Relique, ItemEffect.ResonanceFacile, (int)CardSuit.Souffle, 90, "A8646A", "L'air sous la cloche est toujours le même. On le respire quand même."),
+                Item("R_ClocheOeil", "Cloche à l'œil", ItemKind.Relique, ItemEffect.ResonanceFacile, (int)CardSuit.Regard, 90, "D9D3C6", "Il te regarde à travers le verre. Il ne cligne jamais."),
+                Item("R_ClocheMain", "Cloche à la main", ItemKind.Relique, ItemEffect.ResonanceFacile, (int)CardSuit.Main, 90, "A9A397", "Une main tendue, mise sous verre. Personne ne la prend."),
+                Item("R_ExVotoCoeur", "Ex-voto au cœur", ItemKind.Relique, ItemEffect.DegatsClasse, (int)CardSuit.Coeur, 95, "8E2A26", "Un cœur de cire cloué au mur d'une chapelle. Merci pour rien."),
+                Item("R_ExVotoPoumons", "Ex-voto aux poumons", ItemKind.Relique, ItemEffect.DegatsClasse, (int)CardSuit.Souffle, 95, "8E8C86", "Pour un souffle qui revient. Il revient en cri."),
+                Item("R_ExVotoOeil", "Ex-voto à l'œil", ItemKind.Relique, ItemEffect.DegatsClasse, (int)CardSuit.Regard, 95, "8E8C86", "Pour voir clair à nouveau, et viser juste."),
+                Item("R_ExVotoMain", "Ex-voto à la main", ItemKind.Relique, ItemEffect.DegatsClasse, (int)CardSuit.Main, 95, "8E8C86", "Pour des mains qui ne tremblent plus quand elles frappent."),
+                Item("R_VisageRecolle", "Visage recollé", ItemKind.Relique, ItemEffect.LuciditeMax, 10, 105, "D9D3C6", "Brisé, puis réparé à l'or. Les fêlures se voient ; c'est le but.", true),
+                Item("R_Couverture", "Sous la couverture", ItemKind.Relique, ItemEffect.BouclierDebutManche, 8, 105, "4E5566", "Ne plus sortir de là. Au moins, là-dessous, rien n'atteint.", true),
+                Item("R_Atlas", "Atlas fatigué", ItemKind.Relique, ItemEffect.ForceDebutManche, 1, 110, "5E5032", "Il porte tout, tout le temps. Ça finit par faire des muscles.", true),
+                Item("R_Lacrymatoire", "Lacrymatoire", ItemKind.Relique, ItemEffect.GouttesBonus, 15, 80, "8A1A1A", "Une fiole pour garder ses larmes. La tienne déborde.", true),
+                Item("R_Penseur", "Le Penseur voûté", ItemKind.Relique, ItemEffect.PiocheDebutManche, 2, 105, "5E5032", "La tête entre les mains, il ressasse. Parfois, il en sort une idée."),
+                Item("R_Danseuse", "Danseuse brisée", ItemKind.Relique, ItemEffect.EnergiePremierTour, 1, 110, "D9D3C6", "Un bras en moins, elle tourne encore quand on remonte la boîte."),
+                Item("R_Sablier", "Sablier presque vide", ItemKind.Relique, ItemEffect.RelanceGratuite, 1, 75, "8A3A22", "Le temps se retourne, une fois. Une relance gratuite par boutique."),
+                Item("R_Corbeau", "Le Corbeau", ItemKind.Relique, ItemEffect.RemiseBoutique, 20, 90, "1A1717", "Perché sur les livres que tu ne lis plus. « Jamais plus », mais moins cher."),
+                Item("R_CoeurPerce", "Cœur percé", ItemKind.Relique, ItemEffect.SangCartes, 50, 90, "8E2A26", "Transpercé, il goutte sans arrêt. Tes cartes absorbent plus de sang."),
+                Item("R_Vanite", "Vanité", ItemKind.Relique, ItemEffect.DegatsSiLuciditeBasse, 3, 110, "C2B79C", "Memento mori. Plus tu vacilles, plus tu frappes fort.", true),
+                Item("R_Metronome", "Métronome", ItemKind.Relique, ItemEffect.EnergieMax, 1, 150, "3A2618", "Il impose le tempo. Même lent, c'est un tempo.", true),
+                Item("R_VoileNoir", "Voile de deuil", ItemKind.Relique, ItemEffect.VoileAdverse, 0, 110, "231E26", "Couvrir ce qu'on ne veut plus voir. Chez l'autre, ça marche aussi.", true),
+                Item("R_Reliquaire", "Reliquaire", ItemKind.Relique, ItemEffect.Reliquaire, 0, 120, "A8873E", "On y garde ce qui compte. Ce qu'on y met compte deux fois plus.", true),
+                Item("R_BrasCroises", "Bras croisés", ItemKind.Relique, ItemEffect.PremierCoupReduit, 4, 95, "A9A397", "Elle se serre fort dans ses propres bras. Le premier coup glisse.", true),
+                Item("R_Veilleuse", "Veilleuse", ItemKind.Relique, ItemEffect.SoinDebutTour, 2, 100, "D9CFA0", "Une petite lune allumée toute la nuit. Pas grand-chose, mais elle reste.", true),
+                Item("R_RoseFanee", "Rose fanée", ItemKind.Relique, ItemEffect.Epines, 2, 100, "5C1A20", "Les pétales sont tombés. Les épines, elles, sont restées.", true),
+
+                Item("I_Hemostatique", "Hémostatique", ItemKind.Consommable, ItemEffect.SaignementReduitTour, 0, 40, "C9BFAE", "Tu saignes deux fois moins pendant ce tour.", true),
+                Item("I_Anticoagulant", "Anticoagulant", ItemKind.Consommable, ItemEffect.SaignementAdverseTour, 0, 45, "6E0B0E", "Ton adversaire saigne deux fois plus pendant ce tour.", true),
+                Item("I_Cardiotonique", "Cardiotonique", ItemKind.Consommable, ItemEffect.NiveauClasse, (int)CardSuit.Coeur, 60, "8E2A26", "Le cœur bat plus fort. +1 niveau à tes cartes Cœur. (Utilisable en boutique.)"),
+                Item("I_Bronchodilatateur", "Bronchodilatateur", ItemKind.Consommable, ItemEffect.NiveauClasse, (int)CardSuit.Souffle, 60, "6A7A9A", "L'air passe enfin. +1 niveau à tes cartes Souffle. (Utilisable en boutique.)"),
+                Item("I_Mydriatique", "Mydriatique", ItemKind.Consommable, ItemEffect.NiveauClasse, (int)CardSuit.Regard, 60, "1E2233", "Les pupilles s'ouvrent. +1 niveau à tes cartes Regard. (Utilisable en boutique.)"),
+                Item("I_Myorelaxant", "Myorelaxant", ItemKind.Consommable, ItemEffect.NiveauClasse, (int)CardSuit.Main, 60, "C2B79C", "Les doigts se desserrent. +1 niveau à tes cartes Main. (Utilisable en boutique.)"),
+                Item("I_Excitant", "Excitant", ItemKind.Consommable, ItemEffect.GagnerEnergie, 2, 55, "D9A441", "Le cœur s'emballe, les mains aussi.", true),
+                Item("I_Tranquillisant", "Tranquillisant", ItemKind.Consommable, ItemEffect.EnergieAdverseTour, 1, 55, "8FA7B0", "Glissé dans son verre. Elle ralentit, pour ce tour.", true),
+                Item("I_Digitaline", "Digitaline", ItemKind.Consommable, ItemEffect.ConvertirClasse, (int)CardSuit.Coeur, 50, "7A2A5A", "Extrait de digitale : tout se met à battre au même rythme."),
+                Item("I_Ether", "Éther", ItemKind.Consommable, ItemEffect.ConvertirClasse, (int)CardSuit.Souffle, 50, "C8D4D8", "Une bouffée, et tout devient souffle."),
+                Item("I_Belladone", "Belladone", ItemKind.Consommable, ItemEffect.ConvertirClasse, (int)CardSuit.Regard, 50, "3A2A44", "Les pupilles s'élargissent ; tout devient regard."),
+                Item("I_Curare", "Curare", ItemKind.Consommable, ItemEffect.ConvertirClasse, (int)CardSuit.Main, 50, "4A3A20", "Paralyse tout, sauf les mains."),
+                Item("I_DejaVu", "Déjà-vu", ItemKind.Consommable, ItemEffect.CopierCarte, 0, 60, "B8A0C8", "Tu as déjà vécu ce moment. Exactement celui-là.", true),
+                Item("I_Calmant", "Calmant", ItemKind.Consommable, ItemEffect.Purifier, 0, 35, "A7B8A0", "Respire. Ça passe.", true),
+                Item("I_Placebo", "Placebo", ItemKind.Consommable, ItemEffect.Placebo, 0, 30, "E8E4DA", "Du sucre. Mais si tu y crois...", true),
+                Item("I_Antalgique", "Antalgique", ItemKind.Consommable, ItemEffect.Soigner, 15, 50, "D9D3C6", "La douleur recule d'un pas.", true),
+                Item("I_Betabloquant", "Bêtabloquant", ItemKind.Consommable, ItemEffect.GagnerBouclier, 12, 45, "4C5A66", "Le calme, chimiquement.", true),
+                Item("I_Stimulant", "Stimulant", ItemKind.Consommable, ItemEffect.GagnerForce, 2, 55, "A3161A", "Tout paraît possible, pour un temps.", true),
                 Item("I_Somnifere", "Somnifère", ItemKind.Consommable, ItemEffect.Piocher, 3, 45, "8E8A86", "Oublier, recommencer."),
-                Item("I_LunettesFelees", "Lunettes fêlées", ItemKind.Consommable, ItemEffect.AppliquerVulnerable, 3, 45, "4C5A66", "Tout devient net, d'un coup."),
-                Item("I_MiroirFele", "Miroir fêlé", ItemKind.Consommable, ItemEffect.AppliquerFaiblesse, 3, 45, "A3161A", "Ce qu'elle montre n'est pas ce qu'elle est."),
-                Item("I_Musique", "Écouteurs", ItemKind.Consommable, ItemEffect.GagnerForce, 2, 60, "1E2233", "Le volume au maximum."),
-                Item("I_RendezVousPsy", "Rendez-vous chez la psy", ItemKind.Consommable, ItemEffect.PurgerDeck, 0, 80, "D9A441", "On range, ensemble, ce qui encombre. (Utilisable en boutique.)")
+                Item("I_Neuroleptique", "Neuroleptique", ItemKind.Consommable, ItemEffect.AppliquerFaiblesse, 3, 45, "5A4130", "Les voix baissent d'un ton. Les siennes aussi.", true),
+                Item("I_Desinhibant", "Désinhibant", ItemKind.Consommable, ItemEffect.AppliquerVulnerable, 3, 45, "4B3550", "Dire enfin ce qu'on pense, sans détour.", true),
+                Item("I_Antidepresseur", "Antidépresseur", ItemKind.Consommable, ItemEffect.PurgerDeck, 0, 80, "D9A441", "Lentement, ce qui encombre se range. (Utilisable en boutique.)"),
+                Item("I_Kleptomanie", "Kleptomanie", ItemKind.Consommable, ItemEffect.Voler, 0, 120, "C9A227", "Ce n'est pas du vol si on en a vraiment besoin. (Rare.)", true, true)
             };
 
             var db = LoadOrCreate<CardDatabase>($"{DataDir}/CardDatabase.asset");
-            db.playerStarterDeck = new List<CardData> { seLever, seLever, seLever, seLever, seLever, respirer, respirer, respirer, respirer, crier };
-            db.shopPool = new List<CardData> { marcher, poings, nommer, colere, rage, cri, aube, therapie, tenir, ancrage, couverture, traitement, reconstruire, accepter, ecrire, appeler, lucidite, souvenir, cafe, pardonner };
+            // Départ : un « Se lever » et un « Respirer » de chaque classe, plus deux « Crier » d'une même classe tirée au hasard
+            db.playerStarterDeck = new List<CardData> { seLever, seLever, seLever, seLever, respirer, respirer, respirer, respirer, crier, crier };
+            db.starterPerSuit = new List<CardData> { seLever, respirer };
+            db.starterRandomSuit = new List<CardData> { crier, crier };
+            db.shopPool = new List<CardData> { marcher, poings, nommer, colere, rage, cri, aube, therapie, tenir, ancrage, couverture, traitement, reconstruire, accepter, ecrire, appeler, lucidite, souvenir, cafe, pardonner,
+                battements, souffleCourt, regardNoir, gorge, mainTendue, apnee, hemorragie, garrot, transfusion, palpitations, saignerBlanc, echo };
             db.enemyMoves = new List<EnemyMoveData> { mIdees, mSpirale, mPoids, mIntrusives, mInsomnie, mMurmure, mVide, mCulpa, mRechute, mHonte, mGouffre, mCicatrices, mDesespoir, mAngoisse, mEffondrement, mEmprise, mIsolement };
             db.crisisCards = new List<CardData> { doute, rechute, nuitBlanche, honte };
             db.items = items;
+            BuildFaces(db);
             EditorUtility.SetDirty(db);
 
             // Écrit immédiatement chaque asset sur le disque (sinon une étape ultérieure du setup peut recharger
@@ -222,6 +337,15 @@ namespace Lucidite.EditorTools
                     var p = AssetDatabase.GUIDToAssetPath(guid);
                     if (p.EndsWith(".asset") && !s_paths.Contains(p)) AssetDatabase.DeleteAsset(p);
                 }
+
+            // Anciennes statuettes qui ne correspondent plus à aucune relique
+            var relicPrefabs = new HashSet<string>();
+            foreach (var i in items) if (i && i.model) relicPrefabs.Add(AssetDatabase.GetAssetPath(i.model));
+            foreach (var guid in AssetDatabase.FindAssets("t:Prefab", new[] { AssetFactory.PrefabDir + "/Relics" }))
+            {
+                var rp = AssetDatabase.GUIDToAssetPath(guid);
+                if (!relicPrefabs.Contains(rp)) AssetDatabase.DeleteAsset(rp);
+            }
 
             // Vérification
             var check = AssetDatabase.LoadAssetAtPath<CardData>($"{CardDir}/P_SeLever.asset");

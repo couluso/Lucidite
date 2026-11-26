@@ -18,6 +18,9 @@ MonoBehaviour:
   rarity: 2
   theme: 4
   flavorText: Elle gronde sous la peau, faute de mieux.
+  icon: {fileID: 2800000, guid: 69a7cbec6b14de748ab121f93ae9525a, type: 3}
+  face: {fileID: 2800000, guid: 649af8caa04535644b404d9771f6640e, type: 3}
+  faceUpgraded: {fileID: 0}
   cost: 1
   unplayable: 0
   damage: 0

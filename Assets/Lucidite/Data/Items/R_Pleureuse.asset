@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 594c91d710cdb234fbf68a6cef67b53c, type: 3}
+  m_Name: R_Pleureuse
+  m_EditorClassIdentifier: Assembly-CSharp::Lucidite.ItemData
+  itemName: La Pleureuse
+  kind: 0
+  effect: 7
+  value: 2
+  price: 125
+  flavorText: "Elle pleure pour toi, \xE0 genoux, des larmes rouges. Ton adversaire saigne deux fois plus."
+  tint: {r: 0.6627451, g: 0.6392157, b: 0.5921569, a: 1}
+  model: {fileID: 1408195211625126699, guid: d90d722277571a04b91b299be9856dd0, type: 3}
+  enemyCanBuy: 1
+  rare: 0

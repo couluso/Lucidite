@@ -9,6 +9,10 @@ namespace Lucidite
     {
         [Header("Joueuse")]
         public List<CardData> playerStarterDeck = new List<CardData>();
+        [Tooltip("Deck de départ : un exemplaire de chacune de ces cartes dans chaque classe.")]
+        public List<CardData> starterPerSuit = new List<CardData>();
+        [Tooltip("Deck de départ : ces cartes, toutes dans une même classe tirée au hasard.")]
+        public List<CardData> starterRandomSuit = new List<CardData>();
         [Tooltip("Cartes achetables en boutique.")]
         public List<CardData> shopPool = new List<CardData>();
 

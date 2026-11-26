@@ -15,8 +15,11 @@ namespace Lucidite
 
         [Header("Pendule")]
         public float cordLength = 1.2f;
-        public float damping = 0.5f;
-        public float idleSway = 1.2f;
+        public float damping = 0.38f;
+        [Tooltip("Balancement permanent (degrés).")]
+        public float idleSway = 1f;
+        [Tooltip("Multiplie la poussée des chocs (coups, secousses).")]
+        public float impulseScale = 1.6f;
 
         [Header("Lumière")]
         public float spotIntensity = 6f;
@@ -38,7 +41,7 @@ namespace Lucidite
         public void Impulse(float strength)
         {
             var dir = Random.insideUnitCircle.normalized;
-            _velocity += dir * strength;
+            _velocity += dir * strength * impulseScale;
         }
 
         public void FlickerBurst(float duration) => _burst = Mathf.Max(_burst, duration);

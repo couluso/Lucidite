@@ -36,9 +36,9 @@ namespace Lucidite
 
         [Header("Réglages")]
         public float drawInterval = 0.07f;
-        public float tableCardScale = 0.07f;
-        public float playScale = 0.085f;
-        public float intentScale = 0.08f;
+        public float tableCardScale = 0.072f;
+        public float playScale = 0.09f;
+        public float intentScale = 0.082f;
         public int opponentHeldCards = 3;
 
         readonly Dictionary<CardInstance, CardView> _views = new Dictionary<CardInstance, CardView>();
@@ -102,6 +102,16 @@ namespace Lucidite
             yield return new WaitForSeconds(0.5f);
         }
 
+        /// <summary>Elle s'effondre (fin de partie) : ses cartes lui échappent et ne sont plus gérées par le plateau.</summary>
+        public List<CardView> ReleaseOpponentCards()
+        {
+            var list = new List<CardView>();
+            foreach (var v in _opponentHeld)
+                if (v) { if (opponentHand) opponentHand.Remove(v); list.Add(v); }
+            _opponentHeld.Clear();
+            return list;
+        }
+
         /// <summary>Elle repioche jusqu'à tenir son nombre de cartes (l'éventail s'élargit, ses mains suivent).</summary>
         IEnumerator RefillOpponentRoutine()
         {
@@ -163,7 +173,6 @@ namespace Lucidite
                 if (!v) continue;
                 playerHand.Remove(v);
                 v.SetHighlight(false, Color.clear);
-                v.SetBleeding(false); // une fois posée sur la table, la carte ne saigne plus
                 var slot = playRowPoint ? playRowPoint : playPoint;
                 v.transform.SetParent(slot, true);
                 float x = (i - (n - 1) * 0.5f) * playRowSpacing;
@@ -280,6 +289,57 @@ namespace Lucidite
         }
 
         /// <summary>Elle pose ses cartes du tour, face visible, en rangée devant elle.</summary>
+        /// <summary>
+        /// Son plan a changé en cours de tour (pilules) : les cartes restantes sont remises à jour, celles qu'elle
+        /// abandonne retournent dans sa main, les nouvelles sont posées à la suite.
+        /// </summary>
+        public void UpdateIntents(IReadOnlyList<EnemyIntent> intents)
+        {
+            _intentViews.RemoveAll(v => !v);
+            while (_intentViews.Count > intents.Count)
+            {
+                var v = _intentViews[_intentViews.Count - 1];
+                _intentViews.RemoveAt(_intentViews.Count - 1);
+                v.transform.SetParent(intentPoint, true);
+                v.SetTarget(new Vector3(0f, 0.25f, 0.2f), Quaternion.Euler(-40f, 0f, 0f), Vector3.one * intentScale * 0.6f);
+                v.DestroyAfter(0.45f);
+                AudioManager.Play(Sfx.CardSlide, 0.6f);
+            }
+            int n = intents.Count;
+            for (int i = 0; i < n; i++)
+            {
+                CardView v;
+                if (i < _intentViews.Count) v = _intentViews[i];
+                else { v = TakeIntentCard(i); _intentViews.Add(v); AudioManager.Play(Sfx.CardFlip); }
+                v.BindIntent(intents[i]);
+                v.FaceUp = true;
+                v.Punch(0.2f);
+                float x = (i - (n - 1) * 0.5f) * intentSpacing;
+                v.SetTarget(new Vector3(x, 0f, 0f), Quaternion.Euler(0f, 0f, Random.Range(-3f, 3f)), Vector3.one * intentScale);
+            }
+            _intentView = IntentAt(0);
+        }
+
+        CardView TakeIntentCard(int i)
+        {
+            CardView v = null;
+            _opponentHeld.RemoveAll(c => !c);
+            if (_opponentHeld.Count > 0)
+            {
+                int k = (i % 2 == 0) ? _opponentHeld.Count - 1 : 0;
+                v = _opponentHeld[k];
+                _opponentHeld.RemoveAt(k);
+                if (opponentHand) opponentHand.Remove(v);
+            }
+            if (!v)
+            {
+                v = Instantiate(cardPrefab, intentPoint.position, intentPoint.rotation);
+                v.SetTarget(intentPoint.position, intentPoint.rotation, Vector3.one * tableCardScale, true);
+            }
+            v.transform.SetParent(intentPoint, true);
+            return v;
+        }
+
         public void ShowIntents(IReadOnlyList<EnemyIntent> intents)
         {
             ClearIntents(0f);

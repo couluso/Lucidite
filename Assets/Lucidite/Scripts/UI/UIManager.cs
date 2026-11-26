@@ -50,11 +50,6 @@ namespace Lucidite
 
             _gm.OnPhaseChanged += HandlePhase;
             _gm.OnRoundEnded += s => roundSummary.ShowSummary(s, _gm.Player.maxCandles, _gm.Enemy.maxCandles);
-            _gm.OnEnemyShopped += bought =>
-            {
-                shop.EnemyNews = string.Join("   ·   ", bought);
-                if (toast) foreach (var b in bought) toast.Push("La Dépression — " + b);
-            };
             _gm.OnShopOpened += () => { roundSummary.Hide(); shop.Show(); };
             _gm.OnShopClosed += () => { shop.Hide(); deckPicker.Hide(); inspector.ResetState(); };
             _gm.OnMatchEnded += won => StartCoroutine(EndRoutine(won));
@@ -86,6 +81,7 @@ namespace Lucidite
             end.menuButton.onClick.AddListener(() => _gm?.ReturnToTitle());
 
             if (hud.endTurnButton) hud.endTurnButton.onClick.AddListener(() => { AudioManager.Play(Sfx.EndTurn); _gm?.EndTurn(); });
+            if (hud.sortButton) hud.sortButton.onClick.AddListener(() => _gm?.SortHand());
             if (hud.drawPileButton) hud.drawPileButton.onClick.AddListener(() => deck.ShowPile(DeckPanel.Pile.Draw));
             if (hud.discardPileButton) hud.discardPileButton.onClick.AddListener(() => deck.ShowPile(DeckPanel.Pile.Discard));
             if (shop.deckPicker == null) shop.deckPicker = deckPicker;

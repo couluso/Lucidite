@@ -36,11 +36,13 @@ namespace Lucidite
             "<b>Éteins toutes ses bougies avant qu'elle n'éteigne les tiennes.</b>\n\n" +
             "Une manche se gagne en faisant tomber son <b>Emprise</b> à 0 avant que ta <b>Lucidité</b> ne tombe à 0.",
 
-            "Au début de ton tour, tu reçois <b>3 énergies</b> et tu <b>pioches 5 cartes</b>.\n\n" +
+            "Au début de ton tour, tu reçois <b>3 énergies</b> et tu <b>pioches 5 cartes</b>, sans dépasser <b>7 cartes en main</b>. " +
+            "Les pioches bonus (cartes « Pioche », objets) peuvent dépasser cette limite (12 cartes au plus).\n\n" +
             "Chaque carte a un <b>coût</b> (le chiffre dans le coin). <b>Clique sur une carte pour la sélectionner</b> : " +
-            "elle se soulève et saigne. Re-clique pour la reposer (clic droit : tout reposer). Tu sélectionnes autant de cartes que ton énergie le permet.\n\n" +
+            "elle se soulève et s'entoure d'une lueur écarlate. Re-clique pour la reposer (clic droit : tout reposer). Tu sélectionnes autant de cartes que ton énergie le permet.\n\n" +
             "<b>« Jouer le tour »</b> (ou E) : tes cartes sont posées face cachée devant toi, puis retournées une à une. " +
-            "Les cartes non jouées vont à la défausse. Pioche et énergie gagnées par tes cartes arrivent au tour suivant.",
+            "<b>Les cartes non jouées restent dans ta main</b> pour le tour suivant, sauf les Éphémères (épuisées) " +
+            "et les Crises injouables (défaussées). Pioche et énergie gagnées par tes cartes arrivent au tour suivant.",
 
             "<b>Dégâts</b> : font baisser l'Emprise de la Dépression (ou ta Lucidité).\n\n" +
             "<b>Bouclier</b> : absorbe les dégâts avant ta Lucidité. Il disparaît au début de ton tour suivant.\n\n" +
@@ -57,10 +59,10 @@ namespace Lucidite
             "<b>Éphémère</b> : épuisée si elle reste en main à la fin du tour.",
 
             "Au début de ton tour, la Dépression <b>pose ses cartes face visible</b> sur la table : ce sont ses <b>intentions</b>. " +
-            "Elle a sa propre <b>énergie</b> (1 à la première manche, puis +1 à chaque manche) et chacune de ses cartes en coûte : " +
-            "plus la partie avance, plus elle en joue par tour. Survole-les pour les lire ; le résumé au-dessus d'elle additionne ses dégâts.\n\n" +
-            "<b>Elle aussi se renforce entre les manches</b>, comme si elle passait par la boutique : Emprise, Force, bouclier, énergie, " +
-            "cartes affûtées ou nouvelles obsessions. Elle en prend davantage quand elle gagne une manche.",
+            "Elle a sa propre <b>énergie</b> (1 à la première manche, puis 2) et chacune de ses cartes en coûte : " +
+            "plus elle a d'énergie, plus elle en joue par tour. Survole-les pour les lire ; le résumé au-dessus d'elle additionne ses dégâts.\n\n" +
+            "<b>Elle aussi a ses gouttes de sang</b>, gagnées comme les tiennes, et elle les dépense entre les manches. " +
+            "Ce qu'elle achète, tu ne le sais pas : tu le découvriras en jouant contre elle.",
 
             "Après chaque manche, tu gagnes des <b>gouttes de sang</b> (plus si tu gagnes, et selon la Lucidité préservée).\n\n" +
             "Elles se dépensent dans la boutique :\n" +

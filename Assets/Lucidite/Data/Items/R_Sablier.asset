@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 594c91d710cdb234fbf68a6cef67b53c, type: 3}
+  m_Name: R_Sablier
+  m_EditorClassIdentifier: Assembly-CSharp::Lucidite.ItemData
+  itemName: Sablier presque vide
+  kind: 0
+  effect: 9
+  value: 1
+  price: 75
+  flavorText: Le temps se retourne, une fois. Une relance gratuite par boutique.
+  tint: {r: 0.5411765, g: 0.22745098, b: 0.13333334, a: 1}
+  model: {fileID: 5810236832721018219, guid: 7c260b03f03bec0449d3f1e6cd03bd4f, type: 3}
+  enemyCanBuy: 0
+  rare: 0

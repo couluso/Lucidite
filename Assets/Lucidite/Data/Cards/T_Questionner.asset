@@ -13,11 +13,14 @@ MonoBehaviour:
   m_Name: T_Questionner
   m_EditorClassIdentifier: Assembly-CSharp::Lucidite.CardData
   cardName: "Questionner ses pens\xE9es"
-  arcana: V
+  arcana: XVII
   type: 2
   rarity: 2
   theme: 10
   flavorText: "Une pens\xE9e n'est pas un fait."
+  icon: {fileID: 2800000, guid: c74cfb8ee4bf17b4fa000d59b8e11af7, type: 3}
+  face: {fileID: 2800000, guid: 9e8d8fbef836ad24d9826228fb3cba6e, type: 3}
+  faceUpgraded: {fileID: 0}
   cost: 0
   unplayable: 0
   damage: 0

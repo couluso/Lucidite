@@ -1,11 +1,13 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 namespace Lucidite
 {
     /// <summary>
-    /// Boutique entre les manches, volontairement courte : 3 cartes, 1 relique, 1 consommable,
-    /// et trois services sur le deck (améliorer, retirer, transformer une Crise).
+    /// Boutique entre les manches : 3 cartes (chacune avec sa classe), des pilules, des reliques (statuettes),
+    /// et des services sur le deck (faire évoluer, transformer une Crise, brûler), utilisables plusieurs fois :
+    /// leur prix monte à chaque utilisation et revient à la base à la boutique suivante. « Relancer » renouvelle
+    /// toutes les offres (prix croissant lui aussi).
     /// </summary>
     public class ShopSystem
     {
@@ -15,10 +17,11 @@ namespace Lucidite
         readonly System.Func<int> _getBlood;
         readonly System.Action<int> _spendBlood;
         int _removals;
+        int _upgrades, _transforms, _rerolls, _freeRerolls;
 
-        public readonly List<CardData> cardOffers = new List<CardData>();
-        public readonly List<ItemData> itemOffers = new List<ItemData>();
-        public bool upgradeUsed, removeUsed, transformUsed;
+        public readonly List<CardInstance> cardOffers = new List<CardInstance>();
+        public readonly List<ItemData> pillOffers = new List<ItemData>();
+        public readonly List<ItemData> relicOffers = new List<ItemData>();
 
         public ShopSystem(GameConfig cfg, CardDatabase db, Fighter player, System.Func<int> getBlood, System.Action<int> spendBlood)
         {
@@ -38,15 +41,25 @@ namespace Lucidite
             }
         }
         public int ItemPrice(ItemData i) => Discounted(i.price);
-        public int UpgradeCost => Discounted(_cfg.upgradeCost);
+        public int UpgradeCost => Discounted(_cfg.upgradeCost + _upgrades * _cfg.serviceCostIncrease);
+        public int TransformCost => Discounted(_cfg.transformCost + _transforms * _cfg.serviceCostIncrease);
         public int RemoveCost => Discounted(_cfg.removeCostBase + _removals * _cfg.removeCostIncrease);
-        public int TransformCost => Discounted(_cfg.transformCost);
+        public bool FreeReroll => _freeRerolls > 0;
+        public int RerollCost => FreeReroll ? 0 : Discounted(_cfg.rerollCost + _rerolls * _cfg.rerollCostIncrease);
 
+        /// <summary>Nouvelle boutique : prix des services remis à la base, nouvelles offres.</summary>
         public void GenerateOffers()
         {
+            _upgrades = _transforms = _rerolls = 0;
+            _freeRerolls = _player.RelicValue(ItemEffect.RelanceGratuite);
+            Roll();
+        }
+
+        void Roll()
+        {
             cardOffers.Clear();
-            itemOffers.Clear();
-            upgradeUsed = removeUsed = transformUsed = false;
+            pillOffers.Clear();
+            relicOffers.Clear();
 
             var pool = new List<CardData>();
             foreach (var c in _db.shopPool)
@@ -58,35 +71,55 @@ namespace Lucidite
             while (cardOffers.Count < _cfg.cardOffers && pool.Count > 0)
             {
                 var c = pool[Random.Range(0, pool.Count)];
-                cardOffers.Add(c);
+                cardOffers.Add(new CardInstance(c, (CardSuit)Random.Range(1, 5)));
                 pool.RemoveAll(x => x == c);
             }
 
             var relics = new List<ItemData>();
-            var consumables = new List<ItemData>();
+            var pills = new List<ItemData>();
             foreach (var i in _db.items)
             {
                 if (i == null) continue;
+                if (i.rare && Random.value > 0.25f) continue;
                 if (i.kind == ItemKind.Relique) { if (!_player.relics.Contains(i)) relics.Add(i); }
-                else consumables.Add(i);
+                else pills.Add(i);
             }
-            if (relics.Count > 0) itemOffers.Add(relics[Random.Range(0, relics.Count)]);
-            if (consumables.Count > 0) itemOffers.Add(consumables[Random.Range(0, consumables.Count)]);
+            Pick(pills, pillOffers, _cfg.pillOffers);
+            Pick(relics, relicOffers, _cfg.relicOffers);
+        }
+
+        static void Pick(List<ItemData> from, List<ItemData> into, int count)
+        {
+            var bag = new List<ItemData>(from);
+            while (into.Count < count && bag.Count > 0)
+            {
+                int k = Random.Range(0, bag.Count);
+                into.Add(bag[k]);
+                bag.RemoveAt(k);
+            }
         }
 
         bool Pay(int cost)
         {
             if (_getBlood() < cost) return false;
-            _spendBlood(cost);
+            if (cost > 0) _spendBlood(cost);
             return true;
         }
 
-        public string BuyCard(CardData data)
+        public string Reroll()
         {
-            if (!cardOffers.Contains(data)) return "Offre invalide.";
-            if (!Pay(CardPrice(data))) return "Pas assez de gouttes de sang.";
-            _player.deck.Add(new CardInstance(data));
-            cardOffers.Remove(data);
+            if (!Pay(RerollCost)) return "Pas assez de gouttes de sang.";
+            if (_freeRerolls > 0) _freeRerolls--; else _rerolls++;
+            Roll();
+            return null;
+        }
+
+        public string BuyCard(CardInstance offer)
+        {
+            if (!cardOffers.Contains(offer)) return "Offre invalide.";
+            if (!Pay(CardPrice(offer.data))) return "Pas assez de gouttes de sang.";
+            _player.deck.Add(offer);
+            cardOffers.Remove(offer);
             return null;
         }
 
@@ -95,47 +128,45 @@ namespace Lucidite
 
         public string BuyItem(ItemData item)
         {
-            if (!itemOffers.Contains(item)) return "Offre invalide.";
-            if (!CanHoldItem(item)) return "Plus de place pour cet objet.";
-            if (!Pay(ItemPrice(item))) return "Pas assez de gouttes de sang.";
+            var list = item.kind == ItemKind.Relique ? relicOffers : pillOffers;
+            if (!list.Contains(item)) return "Offre invalide.";
+            if (!CanHoldItem(item)) return item.kind == ItemKind.Relique ? "Plus de place sur la table." : "Ton pilulier est plein.";
+            if (item.kind != ItemKind.Relique && !Pay(ItemPrice(item))) return "Pas assez de gouttes de sang.";
             if (item.kind == ItemKind.Relique)
             {
+                if (item.effect == ItemEffect.Reliquaire && GameManager.RandomOtherRelic(_player, item) == null) return "Il te faut une autre relique à magnifier.";
+                if (!Pay(ItemPrice(item))) return "Pas assez de gouttes de sang.";
                 _player.relics.Add(item);
-                if (item.effect == ItemEffect.LuciditeMax) _player.maxHp += item.value;
             }
             else _player.items.Add(new OwnedItem(item));
-            itemOffers.Remove(item);
+            list.Remove(item);
             return null;
         }
 
         public string Upgrade(CardInstance card)
         {
-            if (upgradeUsed) return "Déjà fait pour cette boutique.";
             if (!card.CanUpgrade) return "Cette carte ne peut pas évoluer.";
             if (!Pay(UpgradeCost)) return "Pas assez de gouttes de sang.";
             card.Upgrade();
-            upgradeUsed = true;
+            _upgrades++;
             return null;
         }
 
         public string Remove(CardInstance card)
         {
-            if (removeUsed) return "Déjà fait pour cette boutique.";
             if (_player.deck.All.Count <= 5) return "Ton deck doit garder au moins 5 cartes.";
             if (!Pay(RemoveCost)) return "Pas assez de gouttes de sang.";
             _player.deck.Remove(card);
             _removals++;
-            removeUsed = true;
             return null;
         }
 
         public string Transform(CardInstance card)
         {
-            if (transformUsed) return "Déjà fait pour cette boutique.";
             if (!card.CanTransform) return "Cette carte ne peut pas être transformée.";
             if (!Pay(TransformCost)) return "Pas assez de gouttes de sang.";
             card.Transform();
-            transformUsed = true;
+            _transforms++;
             return null;
         }
     }

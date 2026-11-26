@@ -16,6 +16,8 @@ MonoBehaviour:
   arcana: XX
   theme: 2
   flavorText: "Au bord, \xE7a tire vers le bas."
+  icon: {fileID: 2800000, guid: fff13085982978643be8d9f8d8a3924c, type: 3}
+  face: {fileID: 2800000, guid: e0d2fcbfd4ab9d748b18dbadfe077eb6, type: 3}
   damage: 17
   hits: 1
   block: 0

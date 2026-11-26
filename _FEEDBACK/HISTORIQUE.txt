@@ -1,12 +1,12 @@
 =====================================================================
  LUCIDITÉ — Historique de la conversation avec Claude (Claude Code)
  Projet : DeckBuildingGame (Unity 6000.6, URP, Input System)
- Dernière mise à jour : 26/11/2026
+ Dernière mise à jour : 26/11/2026 (2e PC)
 =====================================================================
 
 Ce fichier sert à reprendre le travail sur un autre ordinateur.
 Pour repartir avec Claude : ouvre une nouvelle session dans le dossier du projet
-et dis-lui « Lis HISTORIQUE_CLAUDE.txt et continue à partir de là ».
+et dis-lui « Lis _FEEDBACK/HISTORIQUE.txt et continue à partir de là ».
 
 
 ---------------------------------------------------------------------
@@ -133,19 +133,318 @@ Editor/            LuciditeSetup, PrefabFactory, DataFactory, UIFactory,
     +0.55 -> +0.3). La vraie cause du saut de luminosité au lancement : les 6
     bougies qui s'allument (lumières à 3 cm de la table, atténuation en 1/d²).
     Ramenées à intensité 0.06, portée 0.3.
+15) (2e PC) Points 13 validés en jeu. Jeu BEAUCOUP trop dur -> rééquilibrage, appuyé
+    par une simulation Python de milliers de parties (joueuse IA naïve) :
+    avant 0 % de victoires (manche 3+ impossible), après ~40 %.
+    - La Dépression a maintenant ses propres GOUTTES DE SANG, gagnées avec le même
+      barème que la joueuse (80 si elle gagne la manche, 50 si elle perd, + 0.6 par
+      point de Lucidité qu'elle t'a fait perdre ; 60 au départ). Elle les dépense
+      entre les manches dans « sa boutique » (EnemyBrain.Shop) : +8 Emprise (50),
+      +1 Force de départ (80), +6 Bouclier de départ (50), affûter une carte +25 %
+      (55, 2 fois max par carte), nouvelle obsession (70), +1 énergie (150, 1 fois).
+      Elle économise parfois pour l'énergie.
+    - Ses achats sont SECRETS : plus de toasts ni de texte dans la boutique (journal
+      seulement dans la console de l'éditeur : « [Lucidité] Boutique de la Dépression »).
+    - Énergie : 1 à la manche 1 puis 2 (3 seulement si elle l'achète).
+    - Emprise 44 +7/manche (avant 42 +12), dégâts +7 %/manche (avant +20 %).
+    - Règles mises à jour.
+    - Simulateur : Tools/Equilibrage (python reglages_actuels.py).
+16) RÈGLE DU PROJET : Claude ne touche JAMAIS à git ni à GitHub (aucune commande).
+    Test du point 15 : 3 manches gagnées d'affilée -> encore trop facile.
+    - Durci : Emprise 48 +8/manche, dégâts +9 %/manche (simulation : ~20 % de
+      victoires pour la joueuse IA naïve ; une vraie joueuse fait nettement mieux).
+    - La Dépression traversait la table (bras, et cartes quand elle se penche) :
+      · éventail remonté (ancre OpponentHand : torse (0, 0.6, 0.32) au lieu de
+        (0, 0.5, 0.37)), bas des cartes ~17 cm au-dessus du plateau ;
+      · OpponentArmsIK connaît la table (tableTopHeight 0.78, tableEdge 0.19 dans
+        son repère) : il relève l'éventail si ses cartes descendent sous
+        plateau + fanClearance (0.12), et écarte / relève progressivement les coudes
+        tant que bras ou avant-bras passent sous plateau + armClearance (0.035) ;
+      · OpponentView : elle se penche moins (avance 0.12 -> 0.06, 12° -> 8°).
+    Validé en jeu.
+17) Sang et blessures :
+    - Cartes sélectionnées : plus de gouttes de sang, seulement un contour écarlate
+      sombre brillant qui pulse (CardPicker ; CardView.SetHighlight(on, couleur,
+      glow) : glow > 2 = couleur HDR, le bloom la fait briller). CardView.SetBleeding
+      supprimé.
+    - Puissance d'un coup : FeedbackDirector.HitPower(lost) = lost / 20 (0 à 1).
+      Tout en dépend : blessures, sang, secousses.
+    - Blessures plus fortes et DURABLES (DamageVisuals) : chaque coup ajoute une
+      marque permanente (scarPerHp 0.4 x fraction de vie perdue x (1 + puissance),
+      plafond maxScar 0.8), qui reste d'une manche à l'autre ; la vie manquante s'y
+      ajoute pendant la manche (missingWeight 0.8). Les gros coups marquent
+      presque instantanément. DamageVisuals.Level dose aussi les saignements :
+      ses blessures et celles de la joueuse saignent toujours à la manche suivante.
+    - Giclée de sang projetée vers l'avant sur la table à chaque coup encaissé
+      (BloodSystem.Spray) : de 3 à 40 gouttelettes, plus rapides, plus grosses
+      et plus éparpillées selon la puissance (éventail large de ±55° à ±80°,
+      élévation 8-55°, vitesses très dispersées : 1.1 à 2.8 m/s). Joueuse : depuis son buste vers la Dépression ;
+      Dépression : depuis sa poitrine vers la joueuse. maxDrops 80 -> 260.
+      Les flaques restent TOUTE LA PARTIE (plus effacées entre les manches ;
+      maxPuddles 350 -> 700, les plus anciennes disparaissent au-delà).
+    - Coup violent (> 0.6) : seconde plaie chez la joueuse, double saignée chez
+      la Dépression.
+    - Secousses proportionnelles (courbe en k + k²) des deux côtés : un gros coup
+      porté à la Dépression fait maintenant aussi trembler la pièce (et arrêt sur
+      image bref au-delà de 0.6).
+18) Retours de jeu :
+    - Gouttes qui traversaient la table : la pièce entière (Environment) tremble,
+      mais les gouttes testaient une hauteur de table fixe en monde. BloodSystem
+      teste maintenant les surfaces dans le repère de la pièce (puddleRoot), arrête
+      la goutte quand son BAS touche le bois, et pose les flaques 1.2-2.5 mm
+      au-dessus (au lieu de 0.2-0.8 mm). Gouttes de sa chaise : 0.7818.
+    - Giclée de la joueuse : départ reculé (caméra + 6 cm devant, 28 cm dessous ;
+      avant 30 cm devant).
+    - GAMEPLAY : les cartes non jouées RESTENT EN MAIN d'un tour à l'autre. Seules
+      partent les Éphémères (épuisées) et les Crises injouables (défaussées après
+      avoir fait mal). Pioche 5 par tour, 10 cartes en main au maximum. Règles
+      mises à jour. C'est plus facile (simulation 20 % -> 34 %) : compensé par
+      Emprise 52 +9/manche (simulation ~21 %).
+    - Destruction de la pièce : gravats = cubes seulement (plus de sphères), un
+      peu plus gros ; pluie de poussière du plafond à chaque secousse destructrice
+      (RoomShake.ceilingDust, 40 + 160 x force particules, plus grosses, plus
+      claires, qui tourbillonnent) ; sons synthétisés : Sfx.Crumble (plâtre qui
+      craque et s'effrite, plus fort quand une fissure s'ouvre) et Sfx.DebrisHit
+      (chaque gravat qui heurte la table / le sol, 3 rebonds max, anti-saturation).
+    - Lampe descendue de 12 cm (cordon 1.2 -> 1.32 m) ; intensités compensées
+      (spot 6 -> 4, fill 0.75 -> 0.5, inverse du carré de la distance) pour garder
+      le même éclairage sur la table.
+19) - Poussière du plafond : elle tombait toute sur une ligne (la boîte d'émission,
+      tournée de 90° pour viser le bas, était devenue une plaque verticale).
+      Émetteur étendu à tout le plafond (3.9 x 3.9 m) + 2 à 7 coulées denses
+      (RoomShake.EmitDustStreams) à des points au hasard, selon la force du coup.
+    - Lampe : balancement permanent 1.2° -> 2.6°, amortissement 0.5 -> 0.28
+      (oscille plus longtemps), chocs x1.6 (HangingLamp.impulseScale).
+20) - Lampe : bougeait trop au repos -> balancement permanent 1° (idleSway),
+      amortissement 0.38 ; les chocs la font toujours bien balancer (x1.6).
+    - LIMITE DE MAIN : la pioche normale (5 par tour) s'arrête à 7 cartes en main
+      (GameConfig.maxHandSize). Les pioches BONUS (cartes avec « Pioche X »,
+      Se pardonner, consommable Somnifère, relique Carnet intime) vont au-delà,
+      jusqu'au plafond absolu de 12 (absoluteMaxHandSize). GameManager.DrawCards
+      (count, bonus). Simulation : effet léger (~21 % -> ~19 %), pas de
+      compensation. Règles mises à jour. Le simulateur modélise maintenant la
+      pioche bonus (champ dr des cartes) et la limite (limit=7).
+      Retour : bougeait trop au calme -> balancement permanent 1°, amortissement
+      0.38 (les chocs restent amplifiés x1.6).
+21) NOUVEAU DESIGN DES CARTES (chaque carte est unique) :
+    - Fond noir sur toute la carte, contour extérieur de la couleur du type,
+      bordure intérieure plus fine à coins arrondis. Couleurs ternies (Palette) :
+      Attaque écarlate 9A2430, Défense bleu marine 2E5F86 (le 547 pur était
+      invisible sur du noir), Tourment violet 74569C (pas de couleur prévue),
+      Crise blanc os CFCAC0, cartes de la Dépression rouge sang sombre 6B1A1E.
+    - Rond du coût en haut à gauche, rond de la VALEUR en bas à droite (dégâts
+      « 6×3 » pour plusieurs coups, sinon bouclier ; vert/rouge si modifiée par
+      Force/Faiblesse/Vulnérable ; pas de rond si la carte n'a pas de valeur).
+      Rond du coût éteint si pas assez d'énergie ; pas de rond pour les injouables.
+      Ses cartes affichent maintenant aussi leur coût en énergie.
+    - Grande icône centrale UNIQUE par carte (48 : cartes, crises, transformations,
+      actions de la Dépression), contour épais blanc teinté par le type, dessinée
+      en code : Editor/CardFaceFactory.cs (Icon(id), une entrée par id d'asset).
+      Aperçu : _FEEDBACK/Apercu_icones_cartes.png. CardData.icon / EnemyMoveData.icon.
+    - Petites icônes de bonus PLEINES en bas à gauche, dans la bordure (6 max) :
+      étoile dorée Force, flèche verte Faiblesse, losange fissuré Vulnérable,
+      carte « + » Pioche, éclair Énergie, éclair barré perte d'énergie, croix Soin,
+      goutte Sang, écu Bouclier secondaire, flamme Épuiser, croissant Éphémère,
+      œil Crise ajoutée, sablier « perds X si gardée », bougie Lucidité basse,
+      étincelle Purge. Logique : Scripts/Presentation/CardFace.cs.
+    - Nom et règles gardés en petit (lisibilité) ; le type n'est plus écrit (couleur).
+    - Même design pour les cartes d'interface (boutique, deck : UIFactory.CardUI)
+      et l'icône dans le panneau d'examen.
+    - Cartes ~10 % plus petites (main 0.062 -> 0.056, Dépression 0.06 -> 0.054,
+      table/jeu/intentions -10 %).
+22) Retour sur le point 21 : icônes invisibles, texte illisible.
+    - Cause : icônes et bonus étaient des quads « découpés » à l'alpha ; vus de
+      loin, les mipmaps moyennaient les traits et l'alpha passait sous le seuil.
+    - Correctif : chaque carte a maintenant SA texture de face (256 x 384) où le
+      fond, les contours, la grande icône et les bonus sont cuits ensemble, en
+      opaque (CardFaceFactory.SaveFace, appelée par DataFactory.BuildFaces une
+      fois tous les effets définis). CardData.face (+ faceUpgraded si la version +
+      change les bonus), EnemyMoveData.face. Plus de quads d'icônes.
+    - Coins arrondis : face, dos et contour lumineux (coins transparents +
+      découpe alpha ; CardFaceFactory.CornerFrac = 0.07 de la largeur).
+    - Plus lisible : nom en gras plus grand, texte des règles agrandi (zone sous
+      l'icône), numéro d'arcane retiré, ronds coût/valeur agrandis (0.17 -> 0.2).
+    - Cartes plus grandes : main 0.066, Dépression 0.062, table 0.072, jeu 0.09,
+      intentions 0.082 (plus grandes qu'avant le point 21).
+23) Cartes ensanglantées, modification « Écarlate », mort de la Dépression.
+    - Les projections de sang qui retombent sur une carte posée à plat (jouée,
+      sur la table) sont absorbées par la carte au lieu de faire une flaque : la
+      carte se couvre peu à peu de sang (masques Blood_0..3, shader PS1 :
+      M_CardFront passe sur PSXLit, _Damage = sang de la carte). Le sang suit la
+      carte dans le deck (CardInstance.blood) ; teinte rouge en boutique/deck.
+    - Carte entièrement couverte -> « Écarlate » (sauf Crises) : dégâts et
+      blocage x1.35 (arrondi au-dessus), soin / Faiblesse / Vulnérabilité /
+      Force +1. Le nom affiche « écarlate », message et son à l'obtention.
+    - Dernière bougie de la Dépression éteinte : au lieu de disparaître vers le
+      bas, ses cartes lui échappent et tombent sur la table, son buste bascule
+      en avant jusqu'à ce que sa tête heurte le plateau (choc, secousse, giclée),
+      sa tête roule joue contre la table, ses bras tombent à plat, elle cesse de
+      respirer, ses yeux s'éteignent. Flaque sur la table sous sa tête, puis le
+      sang coule du bord et s'étale au sol sous elle.
+    - Debug (éditeur / build de développement) : touche P pendant son tour =
+      la Dépression perd sa dernière bougie et meurt immédiatement.
+24) Retour sur le point 23 : animation de mort validée.
+    - Les flaques de la mort s'étalent plus vite (table 7 -> 4.5 s, sol
+      10 -> 6.5 s, la flaque au sol démarre 0.5 s plus tôt).
+    - Les cartes ne se tachaient jamais : elles ne restent à plat sur la table
+      que pendant la résolution, loin de l'endroit où retombe sa giclée. Désormais,
+      chaque fois que la Dépression saigne, une partie des gouttes est projetée en
+      arc PILE sur chacune de TES cartes posées sur la table (BloodSystem.SprayOnto,
+      2 à 6 gouttes par carte selon la violence du coup). Ses cartes à elle ne
+      sont jamais tachées (elles n'ont pas de CardInstance). Une carte devient
+      Écarlate après environ 6 à 10 coups encaissés pendant qu'elle est posée.
+25) Retour sur le point 24 + pioche / défausse sur la table.
+    - Sang quasi invisible sur les cartes en main (loin de la lampe) : le sang
+      s'éclaire désormais d'autant plus qu'il fait sombre (PSXLit _DamageGlow,
+      1.3 sur M_CardFront) ; sur la table, sous la lampe, rien ne change.
+    - Flaques de la mort encore plus rapides (table 2.6 s, sol 3.8 s, la flaque
+      au sol démarre ~0.6 s plus tôt). Elles ne s'enfoncent plus dans la table ni
+      dans les feuilles : posées un peu plus haut (5.8 mm sur la table) et
+      matériau M_BloodPool sans tremblement des sommets (_Jitter 0).
+    - Pioche décalée à droite (x 0.36 -> 0.44) et nouvelle pile de défausse à sa
+      droite (x 0.555). Ce sont de vraies piles (PileView) : leur épaisseur suit
+      le nombre de cartes, la défausse montre la dernière carte défaussée face
+      visible (avec son sang). Survol : contour orange ; clic : liste des cartes
+      de la pile (la pioche dans un ordre caché). Les cartes défaussées volent
+      maintenant vers cette pile. L'ancienne pile décorative a été retirée.
+26) Retour sur le point 25 (validé).
+    - Défausse déplacée à gauche de la joueuse, vers le coin de la table
+      (x -0.47, z -0.17), devant ses bougies. La pioche reste à droite.
+    - Pioche « mal rangée » : chaque carte tournée (jusqu'à ±14°) et décalée,
+      environ une sur quatre dépasse franchement, légère inclinaison
+      (PileView.messiness : 1 pour la pioche, 0.45 pour la défausse).
+    - Écarlate plus accessible : 70 % de la carte couverte suffit
+      (CardInstance.ScarletThreshold = 0.7) ; la carte continue ensuite de se
+      tacher jusqu'à être entièrement rouge.
+    - Flaques de la mort plus grandes : table 0.2 -> 0.32 m, sol 0.34 -> 0.52 m
+      (durées 3 s et 4.2 s pour garder la même vitesse d'écoulement).
+27) Gros ajout : classes de cartes, économie du sang, boutique refaite,
+    pilules, reliques-statuettes, achats de la Dépression, nouvelles cartes.
+    - 4 classes « Anatomie » : Cœur, Souffle, Regard, Main. La classe est
+      portée par chaque exemplaire de carte (CardInstance.suit), pas par le
+      type de carte : deux « Se lever » peuvent être de classes différentes.
+      Les Crises n'ont pas de classe. Repère visuel sans texte : un symbole os
+      clair sous le rond de coût (coin visible même en éventail) et un motif
+      de fond très discret propre à chaque classe (veines, alvéoles, petits
+      yeux, empreinte digitale). Textures Suit_*.png / SuitIcon_*.png.
+    - Niveaux de classe : chaque niveau ajoute +2 aux dégâts / bouclier / soin
+      des cartes de la classe (pilules Cardiotonique, Bronchodilatateur,
+      Mydriatique, Myorelaxant : +1 niveau, avalables en boutique).
+    - Résonance : jouer 3 cartes de la même classe dans un tour déclenche un
+      bonus (Cœur : soin 4 +2/niveau ; Souffle : +2 cartes au prochain tour ;
+      Regard : 2 Vulnérable + 1 Faiblesse ; Main : 8 Bouclier +2/niveau).
+      Les ex-votos abaissent le seuil à 2 pour leur classe ; « Écho » compte
+      pour toutes les classes.
+    - Deck de départ : un « Se lever » et un « Respirer » de chaque classe,
+      plus deux « Crier » d'une même classe tirée au hasard.
+    - Gouttes de sang : base fixe (victoire 60, défaite 25) + 1 goutte par
+      point de saignement infligé à la Dépression pendant la manche.
+      Le saignement suit les projections de sang : il est doublé par le Pélican,
+      l'Anticoagulant, « Hémorragie », et divisé par deux par l'Hémostatique ou
+      « Garrot ». Les projections visibles suivent ce multiplicateur.
+    - Boutique en sections titrées : CARTES (classe visible sur chaque offre),
+      PILULES, RELIQUES, SERVICES ; niveaux de classe affichés ; ton pilulier
+      en bas à droite. Bouton « Relancer » (10, +5 à chaque relance ; le
+      Sablier en offre une gratuite). Les services (évoluer, transformer,
+      brûler) sont répétables : +25 à chaque usage, prix remis à la base à
+      la boutique suivante (brûler garde sa hausse sur la partie).
+    - Pilules : tous les consommables sont des gélules bicolores. Couleurs et
+      motifs tirés au hasard à chaque partie, fixes pendant la partie (il faut
+      réapprendre laquelle fait quoi). Posées sur la table, cliquables pour les
+      avaler. 14 pilules (dont Hémostatique, Anticoagulant, 4 de niveau).
+    - Reliques : 15 statuettes modélisées une par une (Pélican de bronze,
+      4 ex-votos, Madone fêlée, Ange sans tête, Taureau d'airain, Chat
+      porte-bonheur, Penseur, Danseuse, Sablier, Hibou, Calice, Crâne d'onyx).
+      En boutique elles tournent dans un petit studio hors champ ; achetées,
+      elles sont posées sur la table devant toi (5 places).
+    - La Dépression achète aussi certaines pilules et reliques avec ses
+      gouttes ; elles sont posées de son côté de la table et elle avale ses
+      pilules au début de ton tour (tu vois venir le coup).
+    - 12 nouvelles cartes : Battements, Souffle court, Regard noir, Gorge
+      nouée, Main tendue, Apnée, Hémorragie, Garrot, Transfusion,
+      Palpitations, Saigner à blanc, Écho.
+28) Retours sur le point 27 + nouvelles reliques et pilules :
+    - Statuettes refaites dans le thème de la dépression (une par relique) :
+      la Pleureuse, cloches de verre avec un organe dessous (cœur, poumons,
+      œil, main), ex-votos cloués, Visage recollé (kintsugi), Sous la
+      couverture, Atlas fatigué, Lacrymatoire, Penseur voûté, Danseuse
+      brisée, Sablier presque vide, Corbeau sur des livres, Cœur percé,
+      Vanité, Métronome, Voile de deuil, Reliquaire, Bras croisés, Veilleuse,
+      Rose fanée. Les anciens prefabs de statuettes sont supprimés au setup.
+    - Tes statuettes sont posées sur les bords de la table, loin de la main.
+      Prix des reliques baissés d'environ 25 %.
+    - Boutique : contenu dans un bloc mis à l'échelle de l'écran (plus de
+      chevauchement), phrase « Dépense tes gouttes... » retirée, messages en
+      bas ; survoler une offre n'ouvre plus le tooltip de droite ; les
+      pilules sont rendues en 3D (gélules qui tournent).
+    - Pilulier sur la table (blanc, croix rouge) : clic = le couvercle
+      s'ouvre et tes pilules s'alignent à côté, en 3D, avec leur tooltip au
+      survol ; clic sur une pilule = l'avaler. Il se referme hors de ton tour.
+      La Dépression a le sien en face.
+    - Tooltip des cartes : pastille noire avec l'icône blanche de la classe
+      en bas à droite de l'orbe de coût.
+    - Ordre de la main : les cartes sélectionnées sont jouées de gauche à
+      droite. Glisser une carte pour la déplacer, bouton « TRIER LA MAIN »
+      (touche T : alterne classe puis coût / coût puis classe).
+    - Nouvelles reliques : Métronome (+1 énergie par tour), ex-votos (+3
+      dégâts par coup pour une classe), Voile de deuil (une de ses reliques
+      voilée à chaque manche), Reliquaire (double une relique choisie à
+      l'achat), Bras croisés (premier coup du tour réduit de 4), Veilleuse
+      (+2 Lucidité à chaque début de tour), Rose fanée (épines : 2 à chaque
+      fois que tu perds de la Lucidité). Les cloches remplacent les anciens
+      ex-votos pour la Résonance facile.
+    - Nouvelles pilules : Tranquillisant (elle perd 1 énergie ce tour),
+      Digitaline / Éther / Belladone / Curare (jusqu'à 2 cartes
+      sélectionnées changent de classe), Déjà-vu (2 cartes sélectionnées :
+      celle de droite devient celle de gauche), Calmant (retire Faiblesse et
+      Vulnérable), Placebo (effet d'une autre pilule au hasard), Kleptomanie
+      (rare : vole une relique, ou une pilule).
+    - La Dépression achète et utilise aussi : Excitant (elle prévoit plus de
+      cartes), Tranquillisant (tu perds de l'énergie), Déjà-vu (sa dernière
+      carte devient sa première), Kleptomanie, Calmant, Placebo et la
+      plupart des nouvelles reliques. Pas les objets liés à une classe
+      (cloches, ex-votos, conversions, niveaux), qui n'ont pas de sens pour
+      elle.
 
 
 ---------------------------------------------------------------------
  5. ÉTAT ACTUEL / À VÉRIFIER
 ---------------------------------------------------------------------
-Tout compile. Les derniers changements (points 13 et 14) n'ont PAS encore été
-vérifiés en jeu : relancer « Lucidité > Construire le jeu », jouer, faire une
-capture dans _FEEDBACK.
+Tout compile (dotnet build des .csproj générés par Unity). Le design des
+cartes (21-22) est validé. Les points 20 et 23 (limite de main, sang sur les
+cartes, Écarlate, mort de la Dépression) ne sont PAS encore testés en jeu :
+relancer « Lucidité > Construire le jeu » (indispensable : textures, prefab et
+données sont regénérés) puis jouer.
 
 À contrôler :
-- Mains de la joueuse : orientation (palmInward) et carte dans le creux.
-- Luminosité générale après la baisse des bougies et de la lampe (pas trop sombre ?).
-- Équilibrage de la Dépression (énergie / renforcements) sur 3-5 manches.
+- Point 28 (rien n'est encore testé en jeu) : allure des nouvelles statuettes
+  (verre des cloches lisible ?) ; elles ne se survolent plus par accident ;
+  le couvercle du pilulier s'ouvre vers le haut ; pilules alignées à côté de
+  la boîte sans sortir de la table ; boutique sans chevauchement en 16:9 et
+  autre format ; glisser-déposer des cartes et tri ; pilules de conversion /
+  Déjà-vu avec des cartes sélectionnées ; Voile et Reliquaire (effet bien
+  annulé / doublé, affichage sur la statuette) ; achats de la Dépression.
+- Point 27 (rien n'est encore testé en jeu) : symboles de classe lisibles en
+  main, motif de fond pas trop présent ; Résonance qui se déclenche ; gains
+  de gouttes (base + saignement) et équilibre de la boutique ; Relancer ;
+  pilules et statuettes posées sur la table sans gêner la main ni les piles ;
+  statuettes qui tournent dans la boutique ; achats et pilules de la Dépression.
+- Mort (touche P) : la tête touche bien la table sans la traverser, bras posés
+  à plat, cartes qui tombent sur la table, flaques visibles (table puis sol).
+- Piles (points 25-26) : défausse visible dans le coin gauche, pioche en
+  désordre à droite sans gêner la tasse, contour
+  orange au survol, clic -> liste ; sang lisible sur les cartes en main.
+- Sang sur les cartes (point 24) : tes cartes posées se tachent à chaque coup
+  porté ; vitesse de recouvrement (en combien de manches une carte devient
+  Écarlate ?) et lisibilité d'une carte couverte.
+- Difficulté ressentie sur une partie complète (3 à 5 manches) : visée « dur mais
+  pas impossible ». Levier principal : enemyBloodScale, enemyHpPerRound,
+  enemyDamageScalePerRound (dans Editor/DataFactory.cs).
+- Plus aucune goutte dans la table, même pendant les secousses.
+- Main conservée : difficulté ressentie (Emprise remontée pour compenser).
+- Poussière et sons de destruction (pas trop envahissants ?).
+- Lampe plus visible sans gêner la vue sur son visage ; luminosité inchangée.
+- Luminosité générale (point 14) : pas encore confirmée.
 
 
 ---------------------------------------------------------------------
@@ -161,18 +460,50 @@ Mains de la joueuse — composant FpsArmsIK (objet des bras de la joueuse) :
   indexCurl / fingerCurl     repli des doigts.
 
 Mains de la Dépression — composant OpponentArmsIK (objet Depression) :
-  wristOffset, handTiltIn, minSeparation.
+  wristOffset, handTiltIn, minSeparation ; table : tableTopHeight, tableEdge,
+  armClearance, fanClearance. Hauteur de son éventail : ancre « OpponentHand »
+  dans PrefabFactory.BuildDepression.
 Tête de la Dépression — OpponentView : lookAtPlayer (0 à 1), headTilt.
+Mort de la Dépression — OpponentView : collapsePivot (hauteur du point de
+  bascule, 0.2), collapseBack (recul, 0.05), headRestHeight (tête/plateau, 0.09 :
+  augmenter si la tête traverse la table), maxCollapseAngle (72°) ;
+  OpponentArmsIK.collapsedHands (position des mains posées, 0.24 / 0.17).
+Sang sur les cartes — BloodSystem.cardBloodPerDrop (0.03 par goutte ; plus haut
+  = Écarlate plus vite) ; nombre de gouttes visées par carte : OpponentView.Bleed
+  (2 + puissance x 4). Durée d'étalement des flaques de mort : OpponentView
+  (Impact : 4.5 s, CollapseRoutine : 6.5 s). Bonus : CardInstance.ScarletMultiplier (1.35).
+  Opacité du sang sur la face : _DamageMix de M_CardFront (0.88) ; lueur du
+  sang dans la pénombre (cartes en main) : _DamageGlow (1.3).
+Pioche / défausse — objets DrawPile et DiscardPile (sous Board) : PileView
+  (cardsPerLayer, maxLayers, messiness, hoverColor). Seuil d'Écarlate :
+  CardInstance.ScarletThreshold (0.7). Positions durables : deckPos et
+  discardPos dans LuciditeSetup.cs.
 
 Dépression (GameConfig, Data/) :
-  enemyEnergyBase (1), enemyEnergyPerRound (1), enemyMaxEnergy (5),
-  enemyMaxCardsPerTurn (3), enemyPerksPerRound (1),
-  enemyBaseHp, enemyHpPerRound, enemyDamageScalePerRound.
+  enemyEnergyBase (1), enemyEnergyPerRound (1), enemyMaxEnergy (2, hors achat),
+  enemyMaxCardsPerTurn (3), enemyBaseHp (52), enemyHpPerRound (9),
+  enemyDamageScalePerRound (0.09).
+  Sa boutique : enemyStartingBlood (60), enemyBloodScale (1 = mêmes gains que la
+  joueuse ; baisser pour faciliter), enemyPrice* / enemyPerk*, enemyMaxBonusEnergy.
   ATTENTION : DataFactory réécrit ces valeurs à chaque « Construire le jeu » ;
   pour un changement durable, modifier Editor/DataFactory.cs.
 BoardView : opponentHeldCards (5), intentSpacing (écart de ses cartes posées).
+Classes, boutique et sang (GameConfig, réécrit par DataFactory.BuildConfig) :
+  rewardRoundWin (60), rewardRoundLoss (25), bloodPerDamage (1 goutte par point
+  de saignement), suitLevelBonus (+2 par niveau), serviceCostIncrease (25),
+  rerollCost (10) / rerollCostIncrease (5), pillOffers (3), relicOffers (2),
+  relicSlots (5), itemSlots (3). Seuil de Résonance : GameManager.ResonanceNeed.
+  Emplacements des statuettes / pilules sur la table : composant TableItems
+  (objet Board), positions durables dans LuciditeSetup.cs. Taille des
+  statuettes : RelicFactory.Scale (1.45).
+  Pilulier : TableItems.playerPillBoxPoint / enemyPillBoxPoint (positions
+  durables dans LuciditeSetup.cs), pillLength (0.04), pillSpacing (0.05) ;
+  modèle : RelicFactory.BuildPillBox. Objets rares (Kleptomanie) : ItemData.rare
+  (1 chance sur 4 d'apparaître). Bonus des ex-votos : ItemData.ClassDamage (3).
+  Rendu 3D de la boutique : RelicStage (frameHeight 0.105, turnSpeed 35).
 
-Lumière : HangingLamp (spotIntensity 6, fillIntensity 0.75), Candle
+Lumière : HangingLamp (cordon 1.32 m, spotIntensity 4, fillIntensity 0.5,
+  idleSway 1, damping 0.38, impulseScale 1.6), Candle
 (lightIntensity 0.06), exposition dans LuciditeSetup.cs (postExposure 0.3).
 Comme pour GameConfig, les valeurs sont régénérées par « Construire le jeu » :
 modifier PrefabFactory.cs / LuciditeSetup.cs pour les rendre durables.

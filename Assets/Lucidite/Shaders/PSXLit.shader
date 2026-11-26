@@ -15,6 +15,10 @@ Shader "Lucidite/PSXLit"
         _Wrap ("Éclairage enveloppant", Range(0, 1)) = 0.25
         _DamageMap ("Blessures (RGB = couleur, A = seuil d'apparition)", 2D) = "black" {}
         _Damage ("Blessures (0 = intacte, 1 = massacrée)", Range(0, 1)) = 0
+        _DamageMix ("Opacité des blessures (cartes : on devine l'icône sous le sang)", Range(0, 1)) = 1
+        _DamageGlow ("Lueur des blessures dans la pénombre (cartes en main)", Range(0, 3)) = 0
+        _SuitMap ("Classe de la carte (symbole + motif, RGBA)", 2D) = "black" {}
+        _SuitMix ("Classe : opacité", Range(0, 1)) = 0
         [Enum(UnityEngine.Rendering.CullMode)] _Cull ("Cull", Float) = 2
     }
 
@@ -35,11 +39,15 @@ Shader "Lucidite/PSXLit"
             half _Wrap;
             half _Cull;
             half _Damage;
+            half _DamageMix;
+            half _DamageGlow;
+            half _SuitMix;
         CBUFFER_END
 
         TEXTURE2D(_BaseMap); SAMPLER(sampler_BaseMap);
         TEXTURE2D(_EmissionMap); SAMPLER(sampler_EmissionMap);
         TEXTURE2D(_DamageMap); SAMPLER(sampler_DamageMap);
+        TEXTURE2D(_SuitMap); SAMPLER(sampler_SuitMap);
         float _PSXSnapRes;
 
         float4 PSXSnap(float4 positionCS)
@@ -115,9 +123,14 @@ Shader "Lucidite/PSXLit"
             {
                 float2 uv = lerp(i.uv, i.uvAffine, _Affine);
                 half4 albedo = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, uv) * _BaseColor;
+                // Classe de la carte (symbole sous le coût, motif de fond), sous le sang
+                half4 suit = SAMPLE_TEXTURE2D(_SuitMap, sampler_SuitMap, uv);
+                suit.a *= _SuitMix;
+                albedo.rgb = lerp(albedo.rgb, suit.rgb, suit.a);
                 // Blessures progressives : chaque marque apparaît quand _Damage dépasse son seuil (1 - alpha)
                 half4 dm = SAMPLE_TEXTURE2D(_DamageMap, sampler_DamageMap, uv);
                 half show = saturate((_Damage - (1.0h - dm.a)) * 25.0h) * step(0.004h, dm.a);
+                show *= _DamageMix;
                 albedo.rgb = lerp(albedo.rgb, dm.rgb, show);
                 #if defined(_ALPHATEST_ON)
                     clip(albedo.a - _Cutoff);
@@ -143,8 +156,12 @@ Shader "Lucidite/PSXLit"
 
                 half3 color = albedo.rgb * light;
                 #if defined(_EMISSION)
-                    color += SAMPLE_TEXTURE2D(_EmissionMap, sampler_EmissionMap, uv).rgb * _EmissionColor.rgb;
+                    // Le sang éteint en partie ce qui brillait dessous (contours des cartes)
+                    half3 em = lerp(SAMPLE_TEXTURE2D(_EmissionMap, sampler_EmissionMap, uv).rgb, suit.rgb, suit.a);
+                    color += em * _EmissionColor.rgb * (1.0h - show * 0.75h);
                 #endif
+                // Sang lisible même loin de la lampe (cartes en main) : il ressort d'autant plus qu'il fait sombre
+                color += dm.rgb * show * _DamageGlow * saturate(1.0h - dot(light, half3(0.3h, 0.59h, 0.11h)));
                 color = MixFog(color, i.fogCoord);
                 return half4(color, 1);
             }

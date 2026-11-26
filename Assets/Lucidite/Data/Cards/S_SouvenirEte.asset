@@ -18,6 +18,9 @@ MonoBehaviour:
   rarity: 2
   theme: 12
   flavorText: "Le go\xFBt du sel, le rire de quelqu'un."
+  icon: {fileID: 2800000, guid: 1dd69d6604185f8478a94ceb407a08e6, type: 3}
+  face: {fileID: 2800000, guid: 2742910804b45b744bf0c7b3153659fe, type: 3}
+  faceUpgraded: {fileID: 0}
   cost: 1
   unplayable: 0
   damage: 0

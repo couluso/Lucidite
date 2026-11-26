@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 594c91d710cdb234fbf68a6cef67b53c, type: 3}
+  m_Name: I_DejaVu
+  m_EditorClassIdentifier: Assembly-CSharp::Lucidite.ItemData
+  itemName: "D\xE9j\xE0-vu"
+  kind: 1
+  effect: 32
+  value: 0
+  price: 60
+  flavorText: "Tu as d\xE9j\xE0 v\xE9cu ce moment. Exactement celui-l\xE0."
+  tint: {r: 0.72156864, g: 0.627451, b: 0.78431374, a: 1}
+  model: {fileID: 0}
+  enemyCanBuy: 1
+  rare: 0
