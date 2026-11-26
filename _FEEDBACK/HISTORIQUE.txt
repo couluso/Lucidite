@@ -1,0 +1,178 @@
+=====================================================================
+ LUCIDITÉ — Historique de la conversation avec Claude (Claude Code)
+ Projet : DeckBuildingGame (Unity 6000.6, URP, Input System)
+ Dernière mise à jour : 26/11/2026
+=====================================================================
+
+Ce fichier sert à reprendre le travail sur un autre ordinateur.
+Pour repartir avec Claude : ouvre une nouvelle session dans le dossier du projet
+et dis-lui « Lis HISTORIQUE_CLAUDE.txt et continue à partir de là ».
+
+
+---------------------------------------------------------------------
+ 1. LE PROJET
+---------------------------------------------------------------------
+Jeu de deck-building (d'après le PDF du projet) : on joue des cartes contre sa
+propre dépression.
+- Ambiance Buckshot Roulette / PSX / VHS : une étudiante fait face à une version
+  grise et abîmée d'elle-même, dans une pièce sale éclairée par une seule lampe.
+- Vue à la première personne : on voit nos mains qui tiennent un éventail de cartes.
+- Mécaniques copiées de Slay the Spire : dégâts / bouclier, énergie par tour,
+  coût des cartes, Force / Faiblesse / Vulnérable, Crises (cartes parasites).
+- Manches = bougies (3 chacune) ; perdre une manche éteint une bougie.
+- Monnaie : gouttes de sang ; boutique entre les manches (cartes, reliques,
+  consommables, faire évoluer / brûler / transformer une carte).
+- Menu des règles, options, pause, crédits ; HUD minimal.
+
+
+---------------------------------------------------------------------
+ 2. COMMENT CONSTRUIRE LE JEU
+---------------------------------------------------------------------
+Tout est généré par un script éditeur :
+   Menu Unity > « Lucidité > Construire le jeu »
+(Editor/LuciditeSetup.cs, fonction BuildAll). Il crée textures, meshes, prefabs,
+UI, données (cartes, actions de la Dépression, objets, GameConfig), le
+VolumeProfile et la scène. À relancer après chaque modification des scripts
+Editor (PrefabFactory, DataFactory, UIFactory, ThirdParty*...).
+
+Assets tiers (à mettre dans Documents/AssetsUnity, ils sont copiés
+automatiquement dans Assets/Lucidite/ThirdParty) :
+- psx maiden (Sketchfab, CC-BY 4.0, petya-petyavich) : la Dépression.
+  Nécessite le package glTFast (com.unity.cloud.gltfast, déjà dans manifest.json).
+- PSX FPS Hands (CC0, NiKo Gillsky) : bras de la joueuse (dossier FPS_Psx_Hands).
+- Quaternius Furniture Pack (CC0), Apfelgarten Chairs & Tables PSX (CC0).
+- Polices : IM Fell English SC, Special Elite, VT323.
+Les choix d'assets sont dans Editor/ImportChoices.cs (useMaiden, useFpsHands...).
+Le dossier _FEEDBACK/ contient les captures d'écran envoyées à Claude
+(et 18hndcard.jpg : référence de prise des cartes par la main).
+
+Remarque : sur le premier PC, Unity tournait en administrateur, donc Claude ne
+pouvait pas piloter Unity ; il compilait les scripts hors Unity (dotnet build
+d'un .csproj temporaire) et l'utilisateur lançait « Construire le jeu » puis
+envoyait des captures dans _FEEDBACK.
+
+
+---------------------------------------------------------------------
+ 3. ORGANISATION DU CODE (Assets/Lucidite/)
+---------------------------------------------------------------------
+Scripts/Core/
+  GameManager.cs   Boucle de partie : manches, tours, boutique, sélection des cartes,
+                   tour de la Dépression (plusieurs cartes), événements pour l'UI.
+  EnemyBrain.cs    EnemyIntent (une carte de la Dépression), EnemyProgress (ses
+                   renforcements), EnemyBrain.PlanTurn (cartes dans la limite de
+                   son énergie) et EnemyBrain.Shop (sa « boutique » entre manches).
+  Fighter.cs, Deck.cs, CardInstance.cs, ShopSystem.cs, Palette.cs
+Scripts/Data/      CardData, EnemyMoveData (cost, shopOnly), GameConfig, ItemData,
+                   CardDatabase, CardArtLibrary
+Scripts/Presentation/
+  BoardView.cs     Animations de table : pioche, cartes posées face cachée puis
+                   retournées, cartes de la Dépression en rangée, sa main qui se
+                   vide / se remplit.
+  HandView.cs      Éventail de cartes (GetRestFanCorners / GetRestFanUps).
+  FpsArmsIK.cs     IK des bras de la joueuse (asset PSX FPS Hands).
+  OpponentArmsIK.cs IK des bras de la Dépression (modèle maiden).
+  OpponentView.cs  Dépression : respiration, tête qui regarde la joueuse, sang.
+  CameraRig, FeedbackDirector, RoomShake, BloodSystem, BloodEmitter, DamageVisuals,
+  HangingLamp, Candle, LucidityCandles, PSXScreen, CardView, CardPicker...
+Scripts/UI/        HUDPanel, ShopPanel, RulesPanel, EnemyOverlay, UIManager, etc.
+Shaders/           PSXLit.shader (vertex snapping, UV affines, blessures _DamageMap),
+                   VHS.shader
+Editor/            LuciditeSetup, PrefabFactory, DataFactory, UIFactory,
+                   ThirdParty*.cs (Maiden, Hands...), MeshBuilder, TexturePainter...
+
+
+---------------------------------------------------------------------
+ 4. HISTORIQUE DES DEMANDES ET DE CE QUI A ÉTÉ FAIT
+---------------------------------------------------------------------
+1)  Créer le jeu complet d'après le PDF (prefabs, scène, tout le nécessaire).
+2)  Bug : « Construire le jeu » ne construisait pas tout (pas de caméra,
+    MissingReferenceException) -> corrigé (prefabs rechargés après NewScene).
+3)  Grosse refonte : modèles PSX style Fears to Fathom, VHS moins fort, menus
+    dans le thème avec polices, gameplay façon Slay the Spire, secousses de la
+    pièce / lampe / caméra / glitch VHS quand on perd de la vie, bougies = manches,
+    HUD réduit, boutique allégée. Polices téléchargées ; modèles procéduraux
+    améliorés + emplacements pour assets.
+4)  Intégration des 4 packs d'assets (Documents/AssetsUnity).
+5)  Goth Girl (Sketchfab) refusée : non téléchargeable / sans licence.
+    Remplacée par « psx maiden » : grisée, blessée, ensanglantée, posée assise.
+6)  Bugs : mains bizarres, Dépression invisible, cartes « Nouvelle carte » vides
+    -> corrigés (échelle par os, sauvegarde explicite des assets de données).
+7)  Pièce entière qui tremble comme si elle était détruite + juice ; sélection
+    des cartes (carte soulevée, contour écarlate sombre, sang qui goutte jusqu'à la
+    table, désélection possible) ; « Jouer le tour » pose les cartes face cachée
+    devant soi ; cartes de la Dépression plus en avant ; plus de gouttes de sang ;
+    les combattants saignent selon leurs blessures, flaques jusqu'à la manche
+    suivante.
+8)  Cartes posées qui ne gouttent plus, cartes de la Dépression qui ne gouttent
+    pas, FOV élargi (80), secousse ressentie dans la caméra (coup violent), bug du
+    tooltip après achat corrigé.
+9)  Table plus visible, personnages plus proches de la table (jambes dessous),
+    blessures progressives sur bras / mains / visage des deux personnages, mains
+    calées sur la première et la dernière carte. Utilisation de l'asset de mains
+    fourni (PSX FPS Hands) avec IK.
+10) La Dépression joue plusieurs cartes par tour, dans la limite de SON énergie
+    (1 à la manche 1, puis +1 par manche, max 5 ; max 3 cartes / tour). Chaque
+    carte a un coût (lourdes = 2). Entre les manches elle se renforce « comme à
+    la boutique » (+1 renforcement, +1 si elle a gagné la manche) :
+    +10 Emprise max, +1 Force de départ, 8 Bouclier de départ, +1 énergie,
+    « Affûte » une carte (+30 % dégâts) ou nouvelle obsession (cartes
+    exclusives : Crise d'angoisse, Effondrement, Emprise totale, Isolement).
+    Annoncé dans la boutique et par des messages. Règles mises à jour.
+11) Dépression : tête relevée (le bon os de la tête est Bone.018 ; Bone.021 n'est
+    que le sommet du crâne), visage tourné vers la joueuse ; mains posées par IK
+    sur les bords de son éventail ; elle prend ses cartes jouées dans sa main
+    (5 cartes) et repioche après son tour -> ses mains suivent l'éventail.
+12) Main de la joueuse refaite d'après la référence 18hndcard.jpg : poing lâche,
+    coin de la carte pincé entre le pouce (devant) et le flanc de l'index replié
+    (derrière). Éventail de la Dépression tenu plus haut puis plus loin du buste
+    (coudes le long du corps). Mains de la Dépression validées.
+13) Mains de la joueuse : alignées sur l'inclinaison des cartes extrêmes, carte
+    dans le creux pouce-index, paumes tournées vers le centre de l'éventail
+    (palmInward 0.88 ; le dos de la main était trop tourné vers la joueuse).
+14) Luminosité : lampe adoucie (spot 9 -> 6, fill 1.1 -> 0.75, exposition
+    +0.55 -> +0.3). La vraie cause du saut de luminosité au lancement : les 6
+    bougies qui s'allument (lumières à 3 cm de la table, atténuation en 1/d²).
+    Ramenées à intensité 0.06, portée 0.3.
+
+
+---------------------------------------------------------------------
+ 5. ÉTAT ACTUEL / À VÉRIFIER
+---------------------------------------------------------------------
+Tout compile. Les derniers changements (points 13 et 14) n'ont PAS encore été
+vérifiés en jeu : relancer « Lucidité > Construire le jeu », jouer, faire une
+capture dans _FEEDBACK.
+
+À contrôler :
+- Mains de la joueuse : orientation (palmInward) et carte dans le creux.
+- Luminosité générale après la baisse des bougies et de la lampe (pas trop sombre ?).
+- Équilibrage de la Dépression (énergie / renforcements) sur 3-5 manches.
+
+
+---------------------------------------------------------------------
+ 6. RÉGLAGES UTILES (inspecteur)
+---------------------------------------------------------------------
+Mains de la joueuse — composant FpsArmsIK (objet des bras de la joueuse) :
+  palmInward    1 = paume vers le centre (main vue de profil), 0 = dos de la
+                main face à la caméra. Actuel : 0.88.
+  pinchOffset   point pincé par rapport au coin inférieur de la carte extrême
+                (x vers l'intérieur, y vers le haut, z derrière).
+  crookDepth    plus petit = carte plus enfoncée dans le creux pouce-index.
+  handLeanBack / handLeanIn  inclinaison de la main par rapport à la carte.
+  indexCurl / fingerCurl     repli des doigts.
+
+Mains de la Dépression — composant OpponentArmsIK (objet Depression) :
+  wristOffset, handTiltIn, minSeparation.
+Tête de la Dépression — OpponentView : lookAtPlayer (0 à 1), headTilt.
+
+Dépression (GameConfig, Data/) :
+  enemyEnergyBase (1), enemyEnergyPerRound (1), enemyMaxEnergy (5),
+  enemyMaxCardsPerTurn (3), enemyPerksPerRound (1),
+  enemyBaseHp, enemyHpPerRound, enemyDamageScalePerRound.
+  ATTENTION : DataFactory réécrit ces valeurs à chaque « Construire le jeu » ;
+  pour un changement durable, modifier Editor/DataFactory.cs.
+BoardView : opponentHeldCards (5), intentSpacing (écart de ses cartes posées).
+
+Lumière : HangingLamp (spotIntensity 6, fillIntensity 0.75), Candle
+(lightIntensity 0.06), exposition dans LuciditeSetup.cs (postExposure 0.3).
+Comme pour GameConfig, les valeurs sont régénérées par « Construire le jeu » :
+modifier PrefabFactory.cs / LuciditeSetup.cs pour les rendre durables.
