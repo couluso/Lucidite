@@ -1,0 +1,45 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b15e05516b9bbb245b379dd63e24c1f8, type: 3}
+  m_Name: GameConfig
+  m_EditorClassIdentifier: Assembly-CSharp::Lucidite.GameConfig
+  playerCandles: 3
+  enemyCandles: 3
+  playerMaxLucidity: 50
+  energyPerTurn: 3
+  drawPerTurn: 5
+  maxHandSize: 10
+  enemyBaseHp: 42
+  enemyHpPerRound: 12
+  enemyDamageScalePerRound: 0.2
+  enemyEnergyBase: 1
+  enemyEnergyPerRound: 1
+  enemyMaxEnergy: 5
+  enemyMaxCardsPerTurn: 3
+  enemyPerksPerRound: 1
+  startingBlood: 60
+  rewardRoundWin: 80
+  rewardRoundLoss: 50
+  lucidityPerBonusBlood: 2
+  bloodPerDamage: 0.6
+  cardOffers: 3
+  priceCommon: 45
+  priceUncommon: 70
+  priceRare: 110
+  upgradeCost: 3
+  removeCostBase: 60
+  removeCostIncrease: 25
+  transformCost: 4
+  relicSlots: 3
+  itemSlots: 3
+  enemyActDelay: 0.6
+  cardResolveDelay: 0.25

@@ -1,0 +1,48 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 32a8eb9d15e06d9479cbc2d4c758a624, type: 3}
+  m_Name: C_NuitBlanche
+  m_EditorClassIdentifier: Assembly-CSharp::Lucidite.CardData
+  cardName: Nuit blanche
+  arcana: III
+  type: 3
+  rarity: 4
+  theme: 7
+  flavorText: "Les yeux qui br\xFBlent, la t\xEAte qui tourne."
+  cost: 1
+  unplayable: 0
+  damage: 0
+  hits: 1
+  block: 0
+  draw: 0
+  energyGain: 0
+  heal: 0
+  applyWeak: 0
+  applyVulnerable: 0
+  strengthGain: 0
+  bloodGain: 0
+  special: 0
+  specialValue: 0
+  exhaust: 1
+  ethereal: 0
+  loseLucidityIfHeld: 0
+  energyLossOnDraw: 0
+  upCost: 0
+  upDamage: 0
+  upBlock: 0
+  upDraw: 0
+  upMagic: 0
+  upRemovesExhaust: 0
+  priceOverride: 0
+  evolvesInto: {fileID: 0}
+  transformsInto: {fileID: 11400000, guid: f06f4811ef366d544a3f74e454fea496, type: 2}
+  inShop: 0

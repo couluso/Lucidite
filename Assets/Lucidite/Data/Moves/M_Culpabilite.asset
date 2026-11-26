@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3adce69c6ce5f4a41bf32aae6f70e624, type: 3}
+  m_Name: M_Culpabilite
+  m_EditorClassIdentifier: Assembly-CSharp::Lucidite.EnemyMoveData
+  moveName: "Culpabilit\xE9"
+  arcana: VII
+  theme: 4
+  flavorText: "\xAB Tout est de ta faute. \xBB"
+  damage: 0
+  hits: 1
+  block: 0
+  strengthGain: 2
+  applyWeak: 0
+  applyVulnerable: 0
+  crisisCount: 0
+  crisisToDrawPile: 0
+  specificCrisis: {fileID: 0}
+  cost: 1
+  shopOnly: 0
+  minRound: 1
+  weight: 0.7

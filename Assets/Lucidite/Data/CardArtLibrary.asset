@@ -1,0 +1,45 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 660b2218300c4db4f92b6b6a7f710af6, type: 3}
+  m_Name: CardArtLibrary
+  m_EditorClassIdentifier: Assembly-CSharp::Lucidite.CardArtLibrary
+  entries:
+  - theme: 0
+    texture: {fileID: 2800000, guid: a2b1ff311f0fbe94fa778d3b2a774b22, type: 3}
+  - theme: 1
+    texture: {fileID: 2800000, guid: d5a0280104665574a813be0df1b916f4, type: 3}
+  - theme: 2
+    texture: {fileID: 2800000, guid: 26b5bf95aa48d1c4a82a865094a1e393, type: 3}
+  - theme: 3
+    texture: {fileID: 2800000, guid: 1fdf4fe18a601e44a9532ecf3e004ba7, type: 3}
+  - theme: 4
+    texture: {fileID: 2800000, guid: 5b88fcf854aebd14386b9d16f6e9398d, type: 3}
+  - theme: 5
+    texture: {fileID: 2800000, guid: b8e1c88d096b6024da1eeb0dd88c73c0, type: 3}
+  - theme: 6
+    texture: {fileID: 2800000, guid: 6a3d5ae74a7156743aabe3fb96e669e9, type: 3}
+  - theme: 7
+    texture: {fileID: 2800000, guid: 75e5755012d986a4d8e5b61b8224193d, type: 3}
+  - theme: 8
+    texture: {fileID: 2800000, guid: 5386fab965e6b5447b36d6f5d66b650f, type: 3}
+  - theme: 9
+    texture: {fileID: 2800000, guid: 7945af680aa3ebc4f88abdc9ffd41989, type: 3}
+  - theme: 10
+    texture: {fileID: 2800000, guid: 9dabf6d65c02b6d45a9a9390a77da662, type: 3}
+  - theme: 11
+    texture: {fileID: 2800000, guid: 46e2702df4890c14ea2ba0349c59f20d, type: 3}
+  - theme: 12
+    texture: {fileID: 2800000, guid: 09d16d81a8178ce439876684ca355238, type: 3}
+  fallback: {fileID: 2800000, guid: a2b1ff311f0fbe94fa778d3b2a774b22, type: 3}
+  cardBack: {fileID: 2800000, guid: 073731b296564dc44bae45266f9eaf6f, type: 3}
+  bloodDropIcon: {fileID: 2800000, guid: 813b9e24796a94a4a991f6fc9f8f18a5, type: 3}
+  lucidityIcon: {fileID: 2800000, guid: 11e13874bdd4fa34e8560f71eb2c9a06, type: 3}
