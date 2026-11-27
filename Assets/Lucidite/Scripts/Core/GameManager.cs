@@ -67,8 +67,6 @@ namespace Lucidite
         public event Action<int> OnRoundStarted;
         public event Action<int> OnTurnStarted;
         public event Action<EnemyIntent> OnIntentChanged;
-        /// <summary>Achats de la Dépression entre deux manches (texte de chaque renforcement).</summary>
-        public event Action<List<string>> OnEnemyShopped;
         public event Action OnStatsChanged;                 // PV, bouclier, énergie, statuts
         public event Action<Side, int, int> OnDamaged;      // côté, Lucidité perdue, dégâts bloqués
         public event Action<Side, int> OnHealed;
@@ -86,10 +84,17 @@ namespace Lucidite
         public event Action<CardData, int> OnCrisisInjected;
         public event Action<bool> OnPausedChanged;
         public event Action OnSelectionChanged;
+        public event Action<CardSuit> OnResonance;           // 3 cartes d'une même classe jouées dans le tour
+        public event Action<Side, ItemData> OnItemUsed;      // pilule avalée (par la joueuse ou par elle)
+        public event Action<Side, ItemData> OnItemBought;    // achat d'une relique ou d'une pilule (elle : entre les manches)
 
         EnemyBrain _brain;
         readonly List<CardInstance> _selected = new List<CardInstance>();
-        int _nextDraw, _nextEnergy, _spilled;
+        int _nextDraw, _nextEnergy;
+        // Saignement versé pendant la manche (Lucidité perdue × multiplicateur de saignement) : donne les gouttes bonus
+        float _spilled, _enemySpilled;
+        // Multiplicateurs de saignement du tour en cours (pilules, cartes), indexés par Side
+        readonly float[] _turnBleed = { 1f, 1f };
         int _busy;
         bool _endTurnRequested;
         bool _shopDone;
@@ -117,7 +122,25 @@ namespace Lucidite
             if (kb.escapeKey.wasPressedThisFrame && Phase != GamePhase.Title && Phase != GamePhase.Ended)
                 SetPaused(!IsPaused);
             if ((kb.eKey.wasPressedThisFrame || kb.enterKey.wasPressedThisFrame) && CanAct) EndTurn();
+            if (kb.tKey.wasPressedThisFrame && CanAct) SortHand();
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (kb.pKey.wasPressedThisFrame && Phase == GamePhase.PlayerTurn && !IsPaused) DebugKillOpponent();
+#endif
         }
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        /// <summary>[Debug, touche P] Termine la manche : la Dépression perd sa dernière bougie et meurt.</summary>
+        void DebugKillOpponent()
+        {
+            if (Enemy == null || Enemy.IsDead) return;
+            Enemy.candles = 1;
+            Enemy.block = 0;
+            int lost = Enemy.LoseHp(Enemy.hp);
+            OnDamaged?.Invoke(Side.Opponent, lost, 0);
+            NotifyStats();
+            Message("[Debug] La Dépression s'éteint.");
+        }
+#endif
 
         // ================================================================== API
 
@@ -202,6 +225,59 @@ namespace Lucidite
             NotifyStats();
         }
 
+        // ------------------------------------------------------------------ Ordre de la main (les cartes sont jouées de gauche à droite)
+
+        /// <summary>Déplace une carte de la main (glisser-déposer) : elle prend la place <paramref name="index"/>.</summary>
+        public void MoveInHand(CardInstance c, int index)
+        {
+            if (Player == null || !CanAct) return;
+            int from = Player.hand.IndexOf(c);
+            if (from < 0) return;
+            index = Mathf.Clamp(index, 0, Player.hand.Count - 1);
+            if (index == from) return;
+            Player.hand.RemoveAt(from);
+            Player.hand.Insert(index, c);
+            AudioManager.Play(Sfx.CardSlide, 0.35f);
+            OnSelectionChanged?.Invoke();
+        }
+
+        int _sortMode;
+        /// <summary>Trie la main : par classe puis coût, ou (deuxième appui) par coût puis classe.</summary>
+        public void SortHand()
+        {
+            if (Player == null || !CanAct || Player.hand.Count < 2) return;
+            var order = new List<CardInstance>(Player.hand);
+            int Key(CardInstance c) => c.IsCrisis ? 1000 : 0;
+            if (_sortMode == 0)
+                order.Sort((a, b) => Key(a) != Key(b) ? Key(a) - Key(b) : a.suit != b.suit ? a.suit - b.suit : a.Cost != b.Cost ? a.Cost - b.Cost : string.CompareOrdinal(a.data.cardName, b.data.cardName));
+            else
+                order.Sort((a, b) => Key(a) != Key(b) ? Key(a) - Key(b) : a.Cost != b.Cost ? a.Cost - b.Cost : a.suit != b.suit ? a.suit - b.suit : string.CompareOrdinal(a.data.cardName, b.data.cardName));
+            _sortMode = 1 - _sortMode;
+            Player.hand.Clear();
+            Player.hand.AddRange(order);
+            AudioManager.Play(Sfx.CardSlide, 0.7f);
+            Message(_sortMode == 1 ? "Main triée par classe." : "Main triée par coût.");
+            OnSelectionChanged?.Invoke();
+        }
+
+        /// <summary>Cartes sélectionnées dans l'ordre de la main (de gauche à droite) : l'ordre où elles seront jouées.</summary>
+        public List<CardInstance> SelectedInHandOrder()
+        {
+            var l = new List<CardInstance>();
+            if (Player == null) return l;
+            foreach (var c in Player.hand) if (_selected.Contains(c)) l.Add(c);
+            return l;
+        }
+
+        /// <summary>Retire de la sélection les cartes (les plus à droite d'abord) que l'énergie ne permet plus de payer.</summary>
+        void FitSelectionToEnergy()
+        {
+            if (Player == null) return;
+            var order = SelectedInHandOrder();
+            for (int i = order.Count - 1; i >= 0 && SelectedCost > Player.energy; i--) _selected.Remove(order[i]);
+            OnSelectionChanged?.Invoke();
+        }
+
         /// <summary>« Jouer le tour » : les cartes sélectionnées sont posées et résolues, puis la Dépression joue.</summary>
         public void EndTurn()
         {
@@ -219,6 +295,26 @@ namespace Lucidite
             Blood = Mathf.Max(0, Blood + delta);
             if (delta > 0) Stats.bloodEarned += delta;
             OnBloodChanged?.Invoke(Blood, delta);
+        }
+
+        /// <summary>
+        /// Saignement d'un combattant : multiplie ses projections de sang (et donc le sang sur les cartes)
+        /// et les gouttes que l'adversaire gagne en le faisant saigner.
+        /// </summary>
+        public float BleedMultiplier(Side victim)
+        {
+            var attacker = victim == Side.Player ? Enemy : Player;
+            float m = _turnBleed[(int)victim];
+            if (attacker != null) m *= 1f + attacker.RelicPower(ItemEffect.SaignementAdverse); // ×2, ×3 si magnifiée
+            return m;
+        }
+
+        /// <summary>Saignement d'une perte de Lucidité (le compte de la manche donne les gouttes bonus).</summary>
+        void Spill(Side victim, int lost)
+        {
+            if (lost <= 0) return;
+            if (victim == Side.Opponent) _spilled += lost * BleedMultiplier(victim);
+            else _enemySpilled += lost * BleedMultiplier(victim);
         }
 
         public void NotifyDeckChanged() => OnDeckChanged?.Invoke();
@@ -242,8 +338,21 @@ namespace Lucidite
             Enemy = new Fighter(Side.Opponent, "Ta Dépression", config.enemyCandles, seed * 7 + 13);
             Player.maxHp = config.playerMaxLucidity;
             Player.maxEnergy = config.energyPerTurn;
-            foreach (var c in database.playerStarterDeck) if (c) Player.deck.Add(new CardInstance(c));
+            _sortMode = 0;
+            // Deck de départ : un « Se lever » et un « Respirer » de chaque classe, deux « Crier » d'une même classe au hasard
+            CardInstance.ResetLevels();
+            CardInstance.LevelBonus = config.suitLevelBonus;
+            PillLooks.NewRun(seed, database.items);
+            if (database.starterPerSuit.Count + database.starterRandomSuit.Count > 0)
+            {
+                foreach (var c in database.starterPerSuit)
+                    if (c) for (int s = 1; s <= 4; s++) Player.deck.Add(new CardInstance(c, (CardSuit)s));
+                var shared = RandomSuit();
+                foreach (var c in database.starterRandomSuit) if (c) Player.deck.Add(new CardInstance(c, shared));
+            }
+            else foreach (var c in database.playerStarterDeck) if (c) Player.deck.Add(new CardInstance(c, RandomSuit()));
             _brain = new EnemyBrain(database.enemyMoves);
+            _brain.progress.blood = config.enemyStartingBlood;
 
             Stats = new MatchStats();
             Blood = 0;
@@ -260,10 +369,11 @@ namespace Lucidite
                 yield return RoundRoutine();
                 if (CheckMatchEnd()) yield break;
 
-                // Elle aussi passe par la "boutique" : elle se renforce pour la manche suivante
-                int perks = config.enemyPerksPerRound + (_lastRoundWon ? 0 : 1);
-                var bought = _brain.Shop(perks, Round);
-                if (bought.Count > 0) OnEnemyShopped?.Invoke(bought);
+                // Elle aussi passe par la "boutique" avec ses gouttes de sang ; ses reliques et pilules se posent de son côté
+                var bought = _brain.Shop(config, Round, Enemy, database.items, (item) => OnItemBought?.Invoke(Side.Opponent, item));
+#if UNITY_EDITOR
+                if (bought.Count > 0) Debug.Log($"[Lucidité] Boutique de la Dépression (manche {Round}, reste {_brain.progress.blood} gouttes) : {string.Join(" | ", bought)}");
+#endif
 
                 SetPhase(GamePhase.Shop);
                 Shop.GenerateOffers();
@@ -278,22 +388,31 @@ namespace Lucidite
         {
             SetPhase(GamePhase.RoundIntro);
             Turn = 0;
-            Player.ResetForRound(Player.maxHp);
+            // Voile noir : une relique adverse au hasard est sans effet pendant la manche (choix simultanés)
+            Player.veiled = Enemy.veiled = null;
+            var veilOnEnemy = Player.HasRelic(ItemEffect.VoileAdverse) && Enemy.relics.Count > 0 ? Enemy.relics[UnityEngine.Random.Range(0, Enemy.relics.Count)] : null;
+            var veilOnPlayer = Enemy.HasRelic(ItemEffect.VoileAdverse) && Player.relics.Count > 0 ? Player.relics[UnityEngine.Random.Range(0, Player.relics.Count)] : null;
+            Enemy.veiled = veilOnEnemy; Player.veiled = veilOnPlayer;
+            Player.ResetForRound(config.playerMaxLucidity + Player.RelicValue(ItemEffect.LuciditeMax));
+            Player.maxEnergy = config.energyPerTurn + Player.RelicValue(ItemEffect.EnergieMax);
             var perks = _brain.progress;
-            Enemy.ResetForRound(config.enemyBaseHp + (Round - 1) * config.enemyHpPerRound + perks.bonusMaxHp);
+            Enemy.ResetForRound(config.enemyBaseHp + (Round - 1) * config.enemyHpPerRound + perks.bonusMaxHp + Enemy.RelicValue(ItemEffect.LuciditeMax));
             Enemy.maxEnergy = Mathf.Min(config.enemyMaxEnergy,
-                config.enemyEnergyBase + Mathf.FloorToInt((Round - 1) * config.enemyEnergyPerRound) + perks.bonusEnergy);
-            Enemy.strength = perks.startStrength;
-            Enemy.block = perks.startBlock;
+                config.enemyEnergyBase + Mathf.FloorToInt((Round - 1) * config.enemyEnergyPerRound)) + perks.bonusEnergy + Enemy.RelicValue(ItemEffect.EnergieMax);
+            Enemy.strength = perks.startStrength + Enemy.RelicValue(ItemEffect.ForceDebutManche);
+            Enemy.block = perks.startBlock + Enemy.RelicValue(ItemEffect.BouclierDebutManche);
             Player.block = Player.RelicValue(ItemEffect.BouclierDebutManche);
             Player.strength = Player.RelicValue(ItemEffect.ForceDebutManche);
             Player.hand.Clear();
             Player.deck.ResetForRound();
             _brain.ResetForRound();
-            _selected.Clear(); _nextDraw = 0; _nextEnergy = 0; _spilled = 0;
+            _selected.Clear(); _nextDraw = 0; _nextEnergy = 0; _spilled = 0f; _enemySpilled = 0f;
+            _turnBleed[0] = _turnBleed[1] = 1f;
             OnRoundStarted?.Invoke(Round);
             NotifyStats();
             if (board) yield return board.RoundStartRoutine(Round);
+            if (veilOnEnemy) Message($"Ton voile noir recouvre « {veilOnEnemy.itemName} » : sans effet cette manche.");
+            if (veilOnPlayer) Message($"Son voile noir recouvre ta relique « {veilOnPlayer.itemName} » : sans effet cette manche.");
 
             while (!Player.IsDead && !Enemy.IsDead)
             {
@@ -304,6 +423,7 @@ namespace Lucidite
 
             // ----- Fin de manche
             SetPhase(GamePhase.RoundEnd);
+            Player.veiled = Enemy.veiled = null;
             bool won = Enemy.IsDead && !Player.IsDead;
             _lastRoundWon = won;
             Stats.roundsPlayed++;
@@ -314,23 +434,24 @@ namespace Lucidite
 
             var summary = new RoundSummary { round = Round, playerWon = won, playerCandles = Player.candles, enemyCandles = Enemy.candles };
             int blood;
-            if (won)
+            // Une base (victoire ou défaite), puis un bonus selon à quel point tu l'as fait saigner
+            blood = won ? config.rewardRoundWin : config.rewardRoundLoss;
+            summary.lines.Add(won ? $"Base (manche gagnée) : +{blood}" : $"Base (manche perdue) : +{blood}");
+            if (config.lucidityPerBonusBlood > 0 && won)
             {
-                blood = config.rewardRoundWin;
-                summary.lines.Add($"Manche gagnée : +{config.rewardRoundWin}");
-                int bonus = config.lucidityPerBonusBlood > 0 ? Player.hp / config.lucidityPerBonusBlood : 0;
+                int bonus = Player.hp / config.lucidityPerBonusBlood;
                 if (bonus > 0) { blood += bonus; summary.lines.Add($"Lucidité préservée ({Player.hp}) : +{bonus}"); }
             }
-            else
-            {
-                blood = config.rewardRoundLoss;
-                summary.lines.Add($"Manche perdue : +{config.rewardRoundLoss}");
-            }
             int spilledBlood = Mathf.FloorToInt(_spilled * config.bloodPerDamage);
-            if (spilledBlood > 0) { blood += spilledBlood; summary.lines.Add($"Sang versé ({_spilled}) : +{spilledBlood}"); }
+            if (spilledBlood > 0) { blood += spilledBlood; summary.lines.Add($"Saignement de la Dépression ({Mathf.RoundToInt(_spilled)}) : +{spilledBlood}"); }
             int relicBlood = Player.RelicValue(ItemEffect.GouttesBonus);
             if (relicBlood > 0) { blood += relicBlood; summary.lines.Add($"Reliques : +{relicBlood}"); }
             summary.bloodTotal = blood;
+
+            // Ses gouttes à elle : même barème que la joueuse (manche gagnée / perdue + sang qu'elle a fait couler)
+            int enemyBlood = (won ? config.rewardRoundLoss : config.rewardRoundWin) + Mathf.FloorToInt(_enemySpilled * config.bloodPerDamage)
+                             + Enemy.RelicValue(ItemEffect.GouttesBonus);
+            _brain.progress.blood += Mathf.RoundToInt(enemyBlood * config.enemyBloodScale);
 
             Player.hand.Clear();
             if (board) yield return board.ClearRoundRoutine(won);
@@ -362,12 +483,27 @@ namespace Lucidite
             Enemy.energy = Mathf.Max(0, Enemy.maxEnergy - spent);
             OnIntentChanged?.Invoke(Intent);
             if (board) board.ShowIntents(_intents);
+            _turnBleed[0] = _turnBleed[1] = 1f;
+            Player.hitThisTurn = Enemy.hitThisTurn = false;
             OnTurnStarted?.Invoke(Turn);
+            int regen = Player.RelicValue(ItemEffect.SoinDebutTour);
+            if (regen > 0) { int h = Player.Heal(regen); if (h > 0) OnHealed?.Invoke(Side.Player, h); }
+            // Elle avale parfois une de ses pilules (posées de son côté de la table)
+            var pill = _brain.ChoosePill(Enemy, Player, _intents);
+            if (pill != null)
+            {
+                Enemy.items.Remove(pill);
+                yield return new WaitForSeconds(0.4f);
+                Message($"La Dépression avale une pilule : {pill.data.itemName}.");
+                yield return ApplyItemRoutine(Side.Opponent, pill.data);
+            }
 
-            int draw = config.drawPerTurn + (Turn == 1 ? Player.RelicValue(ItemEffect.PiocheDebutManche) : 0) + _nextDraw;
+            // Pioche normale jusqu'à la limite de main, puis pioches bonus (cartes « Pioche », relique) au-delà
+            int bonusDraw = (Turn == 1 ? Player.RelicValue(ItemEffect.PiocheDebutManche) : 0) + _nextDraw;
             _nextDraw = 0;
             _busy++;
-            yield return DrawCards(draw);
+            yield return DrawCards(config.drawPerTurn);
+            if (bonusDraw > 0) yield return DrawCards(bonusDraw, bonus: true);
             _busy--;
             NotifyStats();
 
@@ -375,8 +511,9 @@ namespace Lucidite
             while (_busy > 0) yield return null;
             if (Enemy.IsDead || Player.IsDead) yield break;
 
-            // Les cartes sélectionnées sont posées face cachée devant toi, puis retournées et résolues une à une
-            var toPlay = new List<CardInstance>(_selected);
+            // Les cartes sélectionnées sont posées face cachée devant toi, puis retournées et résolues une à une,
+            // de gauche à droite (l'ordre de ta main)
+            var toPlay = SelectedInHandOrder();
             _selected.Clear();
             OnSelectionChanged?.Invoke();
             if (toPlay.Count > 0)
@@ -384,11 +521,22 @@ namespace Lucidite
                 foreach (var c in toPlay) Player.hand.Remove(c);
                 if (board) yield return board.LayDownRoutine(toPlay);
                 var resolved = new List<(CardInstance, bool)>();
+                var suitCount = new int[5];
+                var resonated = new bool[5];
                 foreach (var c in toPlay)
                 {
                     if (Enemy.IsDead) break;
-                    yield return ResolveCardRoutine(c);
+                    yield return ResolveCardRoutine(c, c.suit != CardSuit.Aucune ? suitCount[(int)c.suit] : 0);
                     resolved.Add((c, c.Exhaust || c.IsCrisis));
+                    // Résonance : 3 cartes d'une même classe (2 avec son ex-voto) ; le Joker compte pour toutes
+                    if (c.data.special == CardSpecial.Joker) for (int s = 1; s <= 4; s++) suitCount[s]++;
+                    else if (c.suit != CardSuit.Aucune) suitCount[(int)c.suit]++;
+                    for (int s = 1; s <= 4 && !Enemy.IsDead; s++)
+                        if (!resonated[s] && suitCount[s] >= ResonanceNeed((CardSuit)s))
+                        {
+                            resonated[s] = true;
+                            yield return ResonanceRoutine((CardSuit)s);
+                        }
                 }
                 // Cartes non résolues (adversaire déjà vaincu) : défaussées
                 foreach (var c in toPlay)
@@ -397,7 +545,8 @@ namespace Lucidite
                 if (Enemy.IsDead) yield break;
             }
 
-            // Fin du tour : effets des cartes gardées, Éphémère, défausse
+            // Fin du tour : les cartes non jouées RESTENT en main pour le tour suivant.
+            // Seules partent les Éphémères (épuisées) et les Crises injouables (défaussées, après avoir fait mal).
             var discarded = new List<CardInstance>();
             var exhausted = new List<CardInstance>();
             int heldPain = 0;
@@ -405,14 +554,15 @@ namespace Lucidite
             {
                 heldPain += c.data.loseLucidityIfHeld;
                 if (c.Ethereal) { Player.deck.ExhaustCard(c); exhausted.Add(c); }
-                else { Player.deck.Discard(c); discarded.Add(c); }
+                else if (c.Unplayable) { Player.deck.Discard(c); discarded.Add(c); }
             }
-            Player.hand.Clear();
-            if (board) yield return board.DiscardHandRoutine(discarded, exhausted);
+            Player.hand.RemoveAll(c => exhausted.Contains(c) || discarded.Contains(c));
+            if (board && discarded.Count + exhausted.Count > 0) yield return board.DiscardHandRoutine(discarded, exhausted);
             if (heldPain > 0)
             {
                 int lost = Player.LoseHp(heldPain);
                 Stats.damageTaken += lost;
+                Spill(Side.Player, lost);
                 OnDamaged?.Invoke(Side.Player, lost, 0);
                 Message($"Les Crises gardées en main te rongent : -{lost} Lucidité.");
             }
@@ -424,6 +574,8 @@ namespace Lucidite
         {
             SetPhase(GamePhase.EnemyTurn);
             Enemy.block = 0;
+            int regen = Enemy.RelicValue(ItemEffect.SoinDebutTour);
+            if (regen > 0) { int h = Enemy.Heal(regen); if (h > 0) OnHealed?.Invoke(Side.Opponent, h); }
             NotifyStats();
             yield return new WaitForSeconds(config.enemyActDelay);
 
@@ -438,11 +590,7 @@ namespace Lucidite
 
                 for (int h = 0; h < it.hits && it.damagePerHit > 0 && !Player.IsDead; h++)
                 {
-                    int dmg = CombatRules.AttackDamage(it.damagePerHit, Enemy, Player);
-                    int lost = Player.TakeDamage(dmg, out int blocked);
-                    Stats.damageTaken += lost;
-                    OnDamaged?.Invoke(Side.Player, lost, blocked);
-                    NotifyStats();
+                    int lost = Hit(Enemy, Player, CombatRules.AttackDamage(it.damagePerHit, Enemy, Player), out int blocked);
                     if (board) yield return board.EnemyHitRoutine(lost, blocked, index);
                 }
                 if (it.weak > 0) Player.weak += it.weak;
@@ -474,12 +622,42 @@ namespace Lucidite
             yield return new WaitForSeconds(0.3f);
         }
 
-        IEnumerator DrawCards(int count)
+        /// <summary>
+        /// Un coup porté : bouclier, relique « premier coup réduit » de la victime, saignement, puis ses épines
+        /// (l'attaquant perd de la Lucidité à son tour). Renvoie la Lucidité perdue par la victime.
+        /// </summary>
+        int Hit(Fighter attacker, Fighter victim, int dmg, out int blocked)
+        {
+            if (!victim.hitThisTurn)
+            {
+                victim.hitThisTurn = true;
+                int red = victim.RelicValue(ItemEffect.PremierCoupReduit);
+                if (red > 0 && dmg > 0) dmg = Mathf.Max(0, dmg - red);
+            }
+            int lost = victim.TakeDamage(dmg, out blocked);
+            if (victim == Player) Stats.damageTaken += lost; else Stats.damageDealt += lost;
+            Spill(victim.side, lost);
+            OnDamaged?.Invoke(victim.side, lost, blocked);
+            int thorns = victim.RelicValue(ItemEffect.Epines);
+            if (lost > 0 && thorns > 0 && !attacker.IsDead)
+            {
+                int back = attacker.LoseHp(thorns);
+                if (attacker == Player) Stats.damageTaken += back; else Stats.damageDealt += back;
+                Spill(attacker.side, back);
+                if (back > 0) OnDamaged?.Invoke(attacker.side, back, 0);
+            }
+            NotifyStats();
+            return lost;
+        }
+
+        /// <summary>bonus = pioche venant d'un effet (carte, objet, relique) : ignore la limite de main, pas le plafond absolu.</summary>
+        IEnumerator DrawCards(int count, bool bonus = false)
         {
             var drawn = new List<CardInstance>();
+            int limit = bonus ? Mathf.Max(config.maxHandSize, config.absoluteMaxHandSize) : config.maxHandSize;
             for (int i = 0; i < count; i++)
             {
-                if (Player.hand.Count >= config.maxHandSize) break;
+                if (Player.hand.Count >= limit) break;
                 var c = Player.deck.Draw();
                 if (c == null) break;
                 Player.hand.Add(c);
@@ -495,7 +673,26 @@ namespace Lucidite
         }
 
         /// <summary>Résout une carte déjà posée sur la table (retournée face visible, effets appliqués).</summary>
-        IEnumerator ResolveCardRoutine(CardInstance c)
+        int ResonanceNeed(CardSuit s) => Mathf.Max(1, 3 - Player.RelicPower(ItemEffect.ResonanceFacile, (int)s));
+
+        IEnumerator ResonanceRoutine(CardSuit s)
+        {
+            int lv = CardInstance.SuitLevels[(int)s] * CardInstance.LevelBonus;
+            Message($"Résonance — {CardData.SuitLabel(s)} : {CardData.ResonanceLabel(s)}.");
+            AudioManager.Play(Sfx.Heartbeat, 0.9f);
+            OnResonance?.Invoke(s);
+            switch (s)
+            {
+                case CardSuit.Coeur: { int h = Player.Heal(4 + lv); if (h > 0) OnHealed?.Invoke(Side.Player, h); break; }
+                case CardSuit.Souffle: _nextDraw += 2; break;
+                case CardSuit.Regard: Enemy.vulnerable += 2; Enemy.weak += 1; break;
+                case CardSuit.Main: Player.block += 8 + lv; OnBlockGained?.Invoke(Side.Player, 8 + lv); break;
+            }
+            NotifyStats();
+            yield return new WaitForSeconds(0.45f);
+        }
+
+        IEnumerator ResolveCardRoutine(CardInstance c, int sameSuitBefore)
         {
             Player.energy = Mathf.Max(0, Player.energy - c.Cost);
             Stats.cardsPlayed++;
@@ -504,27 +701,32 @@ namespace Lucidite
             if (board) yield return board.RevealPlayedRoutine(c);
 
             bool low = Player.IsLowLucidity;
-            int bonus = c.data.special == CardSpecial.BonusSiLuciditeBasse && low ? c.SpecialValue : 0;
+            var sp = c.data.special;
+            int bonus = sp == CardSpecial.BonusSiLuciditeBasse && low ? c.SpecialValue : 0;
+            int mult = sp == CardSpecial.DoubleSiEcarlate && c.Scarlet ? 2 : 1;
+            // Saignement du tour : appliqué avant les coups pour que cette carte en profite
+            if (sp == CardSpecial.SaignementAdverseTour) { _turnBleed[(int)Side.Opponent] *= 2f; Message("Elle saigne deux fois plus ce tour."); }
+            if (sp == CardSpecial.SaignementReduitTour) { _turnBleed[(int)Side.Player] *= 0.5f; Message("Tu saignes deux fois moins ce tour."); }
 
             // Dégâts
-            int baseDmg = c.data.special == CardSpecial.DegatsSelonBouclier ? Player.block : (c.Damage > 0 ? c.Damage + bonus : 0);
-            if (baseDmg > 0 || c.data.special == CardSpecial.DegatsSelonBouclier)
+            int classDmg = c.suit != CardSuit.Aucune ? ItemData.ClassDamage * Player.RelicPower(ItemEffect.DegatsClasse, (int)c.suit) : 0;
+            int baseDmg = sp == CardSpecial.DegatsSelonBouclier ? Player.block : (c.Damage > 0 ? (c.Damage + bonus + classDmg) * mult : 0);
+            int hits = c.Hits + (sp == CardSpecial.CoupsParClasse ? sameSuitBefore : 0);
+            if (baseDmg > 0 || sp == CardSpecial.DegatsSelonBouclier)
             {
-                for (int h = 0; h < c.Hits && !Enemy.IsDead; h++)
+                for (int h = 0; h < hits && !Enemy.IsDead; h++)
                 {
-                    int dmg = CombatRules.AttackDamage(baseDmg, Player, Enemy);
-                    int lost = Enemy.TakeDamage(dmg, out int blocked);
-                    Stats.damageDealt += lost;
-                    _spilled += lost;
-                    OnDamaged?.Invoke(Side.Opponent, lost, blocked);
-                    NotifyStats();
+                    int lost = Hit(Player, Enemy, CombatRules.AttackDamage(baseDmg, Player, Enemy), out int blocked);
                     if (board) yield return board.PlayerHitRoutine(lost, blocked);
                 }
             }
             // Bouclier
-            if (c.Block > 0)
+            int extraBlock = 0;
+            if (sp == CardSpecial.BouclierParClasseEnMain && c.suit != CardSuit.Aucune)
+                foreach (var h in Player.hand) if (h.suit == c.suit) extraBlock += c.SpecialValue;
+            if (c.Block > 0 || extraBlock > 0)
             {
-                int b = c.Block + bonus;
+                int b = (c.Block > 0 ? (c.Block + bonus) * mult : 0) + extraBlock;
                 Player.block += b;
                 OnBlockGained?.Invoke(Side.Player, b);
             }
@@ -541,6 +743,18 @@ namespace Lucidite
             {
                 int healed = Player.Heal(c.Heal);
                 if (healed > 0) OnHealed?.Invoke(Side.Player, healed);
+            }
+            if (sp == CardSpecial.SoinSelonSang)
+            {
+                int healed = Player.Heal(c.HealFromBlood);
+                if (healed > 0) OnHealed?.Invoke(Side.Player, healed);
+            }
+            if (sp == CardSpecial.PerdreLucidite && c.SpecialValue > 0)
+            {
+                int lost = Player.LoseHp(c.SpecialValue);
+                Stats.damageTaken += lost;
+                Spill(Side.Player, lost);
+                OnDamaged?.Invoke(Side.Player, lost, 0);
             }
             if (c.Blood > 0) AddBlood(c.Blood);
             NotifyStats();
@@ -580,35 +794,164 @@ namespace Lucidite
         public bool CanUseItem(OwnedItem item)
         {
             if (item == null || item.data.IsPassive || IsPaused) return false;
-            if (Phase == GamePhase.Shop) return item.data.UsableInShop && (item.data.effect != ItemEffect.Soigner);
+            if (Phase == GamePhase.Shop) return item.data.UsableInShop;
             return CanAct;
+        }
+
+        /// <summary>Ce qui empêche d'avaler la pilule maintenant (null si rien).</summary>
+        public string ItemBlockReason(OwnedItem item)
+        {
+            if (!CanUseItem(item)) return Phase == GamePhase.Shop ? "Cette pilule s'avale pendant ton tour." : "Impossible d'avaler une pilule maintenant.";
+            var d = item.data;
+            if (d.effect == ItemEffect.ConvertirClasse && _selected.Count == 0) return "Sélectionne d'abord une ou deux cartes de ta main.";
+            if (d.effect == ItemEffect.CopierCarte && _selected.Count < 2) return "Sélectionne d'abord deux cartes : celle de droite copiera celle de gauche.";
+            if (d.effect == ItemEffect.Voler && Enemy != null && Enemy.relics.Count == 0 && Enemy.items.Count == 0) return "Elle n'a rien à voler.";
+            return null;
         }
 
         public void UseItem(OwnedItem item)
         {
-            if (!CanUseItem(item)) { Message("Impossible d'utiliser cet objet maintenant."); AudioManager.Play(Sfx.Error); return; }
+            string why = item != null ? ItemBlockReason(item) : "";
+            if (why != null) { Message(why); AudioManager.Play(Sfx.Error); return; }
             StartCoroutine(UseItemRoutine(item));
         }
 
         IEnumerator UseItemRoutine(OwnedItem item)
         {
             _busy++;
-            int v = item.data.value;
             Player.items.Remove(item);
             NotifyItemsChanged();
             Message($"{item.data.itemName}.");
+            yield return ApplyItemRoutine(Side.Player, item.data);
+            _busy--;
+        }
+
+        public void NotifyItemBought(Side side, ItemData item) => OnItemBought?.Invoke(side, item);
+
+        /// <summary>Effet d'une pilule, pour la joueuse ou pour la Dépression (la pilule est déjà retirée de son pilulier).</summary>
+        IEnumerator ApplyItemRoutine(Side side, ItemData d)
+        {
+            var self = side == Side.Player ? Player : Enemy;
+            var foe = side == Side.Player ? Enemy : Player;
+            var foeSide = side == Side.Player ? Side.Opponent : Side.Player;
+            int v = d.value;
             AudioManager.Play(Sfx.Heal, 0.6f);
-            switch (item.data.effect)
+            OnItemUsed?.Invoke(side, d);
+            switch (d.effect)
             {
-                case ItemEffect.GagnerBouclier: Player.block += v; OnBlockGained?.Invoke(Side.Player, v); break;
-                case ItemEffect.GagnerEnergie: Player.energy += v; break;
-                case ItemEffect.Soigner: { int h = Player.Heal(v); if (h > 0) OnHealed?.Invoke(Side.Player, h); break; }
-                case ItemEffect.Piocher: yield return DrawCards(v); break;
-                case ItemEffect.AppliquerVulnerable: Enemy.vulnerable += v; break;
-                case ItemEffect.AppliquerFaiblesse: Enemy.weak += v; break;
-                case ItemEffect.GagnerForce: Player.strength += v; break;
+                case ItemEffect.GagnerBouclier: self.block += v; OnBlockGained?.Invoke(side, v); break;
+                case ItemEffect.GagnerEnergie:
+                    if (side == Side.Player) Player.energy += v;
+                    else
+                    {
+                        // Elle a de quoi poser d'autres cartes ce tour
+                        Enemy.energy += v;
+                        var extra = _brain.PlanTurn(Round, config.enemyDamageScalePerRound, v, Mathf.Max(1, v));
+                        if (extra.Count > 0) { _intents.AddRange(extra); if (board) board.UpdateIntents(_intents); OnIntentChanged?.Invoke(Intent); }
+                    }
+                    break;
+                case ItemEffect.EnergieAdverseTour:
+                    if (side == Side.Player)
+                    {
+                        // Elle renonce à ses dernières cartes jusqu'à rentrer dans son énergie réduite
+                        int budget = Enemy.maxEnergy - v, spent = 0;
+                        foreach (var it in _intents) spent += it.move ? it.move.cost : 0;
+                        var dropped = new List<string>();
+                        while (_intents.Count > 0 && spent > Mathf.Max(0, budget))
+                        {
+                            var last = _intents[_intents.Count - 1];
+                            spent -= last.move ? last.move.cost : 0;
+                            dropped.Add(last.move ? last.move.moveName : "?");
+                            _intents.RemoveAt(_intents.Count - 1);
+                        }
+                        Enemy.energy = Mathf.Max(0, Enemy.energy - v);
+                        if (dropped.Count > 0) { Message($"Elle n'a plus la force : elle renonce à « {string.Join(" », « ", dropped)} »."); if (board) board.UpdateIntents(_intents); OnIntentChanged?.Invoke(Intent); }
+                        else Message("Elle s'engourdit, sans renoncer à rien.");
+                    }
+                    else
+                    {
+                        Player.energy = Mathf.Max(0, Player.energy - v);
+                        FitSelectionToEnergy();
+                        Message($"Tu te sens engourdie : -{v} énergie ce tour.");
+                    }
+                    break;
+                case ItemEffect.ConvertirClasse:
+                    if (side == Side.Player && d.Suit != CardSuit.Aucune)
+                    {
+                        var sel = SelectedInHandOrder();
+                        int n = 0;
+                        foreach (var c in sel)
+                        {
+                            if (n >= 2 || c.IsCrisis) continue;
+                            c.suit = d.Suit; n++;
+                            var view = board ? board.ViewOf(c) : null;
+                            if (view) { view.Refresh(); view.Punch(0.3f); }
+                        }
+                        Message(n > 1 ? $"{n} cartes deviennent {CardData.SuitLabel(d.Suit)}." : $"La carte devient {CardData.SuitLabel(d.Suit)}.");
+                        NotifyDeckChanged();
+                    }
+                    break;
+                case ItemEffect.CopierCarte:
+                    if (side == Side.Player)
+                    {
+                        var sel = SelectedInHandOrder();
+                        if (sel.Count >= 2)
+                        {
+                            CardInstance src = sel[0], dst = sel[1];
+                            dst.data = src.data; dst.upgraded = src.upgraded; dst.suit = src.suit;
+                            var view = board ? board.ViewOf(dst) : null;
+                            if (view) { view.Refresh(); view.Punch(0.35f); }
+                            Message($"« {src.Name} » se dédouble.");
+                            FitSelectionToEnergy();
+                            NotifyDeckChanged();
+                        }
+                    }
+                    else if (_intents.Count >= 2)
+                    {
+                        // Elle : sa dernière carte posée devient une copie de la première
+                        var a = _intents[0];
+                        _intents[_intents.Count - 1] = new EnemyIntent { move = a.move, damagePerHit = a.damagePerHit, hits = a.hits, block = a.block, strength = a.strength, weak = a.weak, vulnerable = a.vulnerable, crisis = a.crisis };
+                        Message($"Déjà-vu : « {(a.move ? a.move.moveName : "?")} » revient une seconde fois.");
+                        if (board) board.UpdateIntents(_intents);
+                        OnIntentChanged?.Invoke(Intent);
+                    }
+                    break;
+                case ItemEffect.Voler: Steal(self, foe); break;
+                case ItemEffect.Purifier: self.weak = 0; self.vulnerable = 0; break;
+                case ItemEffect.Placebo:
+                {
+                    var pool = new List<ItemData>();
+                    foreach (var i in database.items)
+                        if (i && i.kind == ItemKind.Consommable && i.effect != ItemEffect.Placebo && !i.NeedsSelection && i.effect != ItemEffect.PurgerDeck
+                            && (side == Side.Player || i.enemyCanBuy))
+                            pool.Add(i);
+                    if (pool.Count > 0)
+                    {
+                        var pick = pool[UnityEngine.Random.Range(0, pool.Count)];
+                        Message($"Placebo... ça agit comme : {pick.itemName}.");
+                        yield return new WaitForSeconds(0.25f);
+                        yield return ApplyItemRoutine(side, pick);
+                    }
+                    break;
+                }
+                case ItemEffect.Soigner: { int h = self.Heal(v); if (h > 0) OnHealed?.Invoke(side, h); break; }
+                case ItemEffect.Piocher: if (side == Side.Player) yield return DrawCards(v, bonus: true); break;
+                case ItemEffect.AppliquerVulnerable: foe.vulnerable += v; break;
+                case ItemEffect.AppliquerFaiblesse: foe.weak += v; break;
+                case ItemEffect.GagnerForce: self.strength += v; break;
+                case ItemEffect.SaignementReduitTour: _turnBleed[(int)side] *= 0.5f; break;
+                case ItemEffect.SaignementAdverseTour: _turnBleed[(int)foeSide] *= 2f; break;
+                case ItemEffect.NiveauClasse:
+                    if (side == Side.Player && d.Suit != CardSuit.Aucune)
+                    {
+                        CardInstance.SuitLevels[(int)d.Suit]++;
+                        Message($"{CardData.SuitLabel(d.Suit)} : niveau {CardInstance.SuitLevels[(int)d.Suit]}.");
+                        NotifyDeckChanged();
+                    }
+                    break;
                 case ItemEffect.PurgerDeck:
                 {
+                    if (side != Side.Player) break;
                     var toRemove = new List<CardInstance>();
                     foreach (var c in Player.deck.All) if (c.IsCrisis && !Player.hand.Contains(c)) toRemove.Add(c);
                     foreach (var c in toRemove) Player.deck.Remove(c);
@@ -617,9 +960,45 @@ namespace Lucidite
                     break;
                 }
             }
+            NotifyItemsChanged();
             NotifyStats();
             yield return null;
-            _busy--;
+        }
+
+        static CardSuit RandomSuit() => (CardSuit)UnityEngine.Random.Range(1, 5);
+
+        int RelicSlots(Fighter f) => f == Player ? config.relicSlots : EnemyBrain.MaxRelics;
+        int PillSlots(Fighter f) => f == Player ? config.itemSlots : EnemyBrain.MaxPills;
+
+        /// <summary>Vol : une relique de l'adversaire au hasard (si la place le permet), sinon une de ses pilules.</summary>
+        void Steal(Fighter thief, Fighter victim)
+        {
+            string who = thief == Player ? "Tu voles" : "Elle te vole";
+            if (victim.relics.Count > 0 && thief.relics.Count < RelicSlots(thief))
+            {
+                var r = victim.relics[UnityEngine.Random.Range(0, victim.relics.Count)];
+                victim.relics.Remove(r);
+                if (victim.buffTarget == r) victim.buffTarget = null;
+                if (victim.veiled == r) victim.veiled = null;
+                thief.relics.Add(r);
+                if (r.effect == ItemEffect.Reliquaire && thief.buffTarget == null) thief.buffTarget = RandomOtherRelic(thief, r);
+                Message($"{who} « {r.itemName} ».");
+            }
+            else if (victim.items.Count > 0 && thief.items.Count < PillSlots(thief))
+            {
+                var o = victim.items[UnityEngine.Random.Range(0, victim.items.Count)];
+                victim.items.Remove(o);
+                thief.items.Add(o);
+                Message($"{who} une pilule : {o.data.itemName}.");
+            }
+            else Message("Rien à prendre : il n'y a plus de place.");
+            NotifyItemsChanged();
+        }
+
+        public static ItemData RandomOtherRelic(Fighter f, ItemData except)
+        {
+            var l = f.relics.FindAll(x => x != except && x.effect != ItemEffect.Reliquaire);
+            return l.Count > 0 ? l[UnityEngine.Random.Range(0, l.Count)] : null;
         }
     }
 }

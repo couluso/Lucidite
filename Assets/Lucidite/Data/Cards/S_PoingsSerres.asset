@@ -18,6 +18,9 @@ MonoBehaviour:
   rarity: 1
   theme: 4
   flavorText: "Serrer jusqu'\xE0 ne plus trembler."
+  icon: {fileID: 2800000, guid: 9b1452d22a11792448580aa238a37280, type: 3}
+  face: {fileID: 2800000, guid: 4dacf71b2d8525e4685227fc05fc0330, type: 3}
+  faceUpgraded: {fileID: 0}
   cost: 1
   unplayable: 0
   damage: 3

@@ -18,6 +18,9 @@ MonoBehaviour:
   rarity: 0
   theme: 11
   flavorText: Tout ce qui ne sortait pas.
+  icon: {fileID: 2800000, guid: 9968dfb2b30dde846ba3790e4243fe4b, type: 3}
+  face: {fileID: 2800000, guid: e6a8cc76dd120d149ae895b702dfee0c, type: 3}
+  faceUpgraded: {fileID: 0}
   cost: 2
   unplayable: 0
   damage: 8

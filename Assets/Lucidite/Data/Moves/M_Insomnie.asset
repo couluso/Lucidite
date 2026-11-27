@@ -16,6 +16,8 @@ MonoBehaviour:
   arcana: XVII
   theme: 7
   flavorText: "3h47. Le plafond n'a pas chang\xE9."
+  icon: {fileID: 2800000, guid: 90b33bbf39d342147ad15035fca10654, type: 3}
+  face: {fileID: 2800000, guid: a24700e746dc88246a7e088c75e2c53d, type: 3}
   damage: 0
   hits: 1
   block: 0

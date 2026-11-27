@@ -15,7 +15,7 @@ namespace Lucidite
         [Tooltip("Ouverture totale maximale de l'éventail (degrés).")]
         public float maxSpread = 46f;
         public float depthStep = 0.003f;
-        public float cardScale = 0.065f;
+        public float cardScale = 0.066f;
 
         [Header("Survol (joueuse)")]
         public float hoverLift = 0.03f;
@@ -30,6 +30,8 @@ namespace Lucidite
         readonly List<CardView> _cards = new List<CardView>();
         public IReadOnlyList<CardView> Cards => _cards;
         public CardView Hovered { get; set; }
+        /// <summary>Carte que la joueuse fait glisser pour réorganiser sa main.</summary>
+        public CardView Dragged { get; set; }
         public bool Contains(CardView v) => v && _cards.Contains(v);
 
         public void Add(CardView v)
@@ -43,7 +45,6 @@ namespace Lucidite
         {
             _cards.Remove(v);
             _wasSelected.Remove(v);
-            if (v) v.SetBleeding(false);
             if (Hovered == v) Hovered = null;
         }
 
@@ -93,9 +94,45 @@ namespace Lucidite
             return true;
         }
 
+        /// <summary>Emplacement de l'éventail le plus proche d'un point (coordonnées locales de la main).</summary>
+        public int IndexAtLocalX(float localX)
+        {
+            int n = _cards.Count;
+            if (n <= 1) return 0;
+            float step = Mathf.Min(maxAngleStep, maxSpread / (n - 1));
+            int best = 0; float bestD = float.MaxValue;
+            for (int i = 0; i < n; i++)
+            {
+                float x = Mathf.Sin((i - (n - 1) * 0.5f) * step * Mathf.Deg2Rad) * radius;
+                float d = Mathf.Abs(x - localX);
+                if (d < bestD) { bestD = d; best = i; }
+            }
+            return best;
+        }
+
+        /// <summary>Côté joueuse, l'éventail suit l'ordre de sa main (les cartes sont jouées de gauche à droite).</summary>
+        void SyncOrder()
+        {
+            var gm = GameManager.Instance;
+            if (side != Side.Player || !gm || gm.Player == null) return;
+            var hand = gm.Player.hand;
+            int Key(CardView v) { int k = v && v.Card != null ? hand.IndexOf(v.Card) : -1; return k < 0 ? 10000 : k; }
+            bool sorted = true;
+            for (int i = 1; i < _cards.Count && sorted; i++) if (Key(_cards[i - 1]) > Key(_cards[i])) sorted = false;
+            if (sorted) return;
+            // Tri stable par insertion (peu de cartes)
+            for (int i = 1; i < _cards.Count; i++)
+            {
+                var v = _cards[i]; int k = Key(v), j = i - 1;
+                while (j >= 0 && Key(_cards[j]) > k) { _cards[j + 1] = _cards[j]; j--; }
+                _cards[j + 1] = v;
+            }
+        }
+
         void LateUpdate()
         {
             _cards.RemoveAll(c => !c);
+            SyncOrder();
             int n = _cards.Count;
             if (n == 0) return;
             float step = n > 1 ? Mathf.Min(maxAngleStep, maxSpread / (n - 1)) : 0f;
@@ -113,7 +150,7 @@ namespace Lucidite
                 if (hoveredIndex >= 0 && i != hoveredIndex)
                     pos.x += Mathf.Sign(i - hoveredIndex) * neighbourSpread / Mathf.Max(1, Mathf.Abs(i - hoveredIndex));
 
-                // Carte sélectionnée : surélevée au-dessus des autres, légèrement en avant, et elle saigne
+                // Carte sélectionnée : surélevée au-dessus des autres, légèrement en avant (lueur écarlate : CardPicker)
                 bool selected = side == Side.Player && v.Card != null && GameManager.Instance && GameManager.Instance.IsSelected(v.Card);
                 if (selected)
                 {
@@ -127,10 +164,16 @@ namespace Lucidite
                     {
                         if (selected) { _wasSelected.Add(v); v.Punch(0.18f); } else _wasSelected.Remove(v);
                     }
-                    v.SetBleeding(selected);
                 }
 
-                if (i == hoveredIndex && side == Side.Player)
+                if (v == Dragged && side == Side.Player)
+                {
+                    // Glissée : soulevée, droite, un peu en avant
+                    pos = new Vector3(pos.x, hoverLift * 1.4f, -hoverForward * 0.6f);
+                    rot = Quaternion.identity;
+                    s *= 1.2f;
+                }
+                else if (i == hoveredIndex && side == Side.Player)
                 {
                     pos = new Vector3(pos.x, hoverLift + (selected ? selectedLift * 0.5f : 0f), -hoverForward);
                     rot = Quaternion.identity;

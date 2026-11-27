@@ -23,28 +23,35 @@ namespace Lucidite.EditorTools
             var box = root.AddComponent<BoxCollider>();
             box.size = new Vector3(1f, 1.5f, 0.05f);
 
+            // Face : texture propre à chaque carte (fond, contours, grande icône, bonus), coins arrondis découpés.
+            // Repères : CardFaceFactory (256 px = 1 unité). Seuls le coût, la valeur et les textes sont dynamiques.
             var front = Prim(PrimitiveType.Quad, "Front", root.transform, Vector3.zero, new Vector3(1f, 1.5f, 1f), CardFront);
             var back = Prim(PrimitiveType.Quad, "Back", root.transform, new Vector3(0, 0, 0.004f), new Vector3(1f, 1.5f, 1f), CardBack, new Vector3(0, 180, 0));
-            var art = Prim(PrimitiveType.Quad, "Art", root.transform, new Vector3(0, 0.22f, -0.003f), new Vector3(0.8f, 0.56f, 1f), CardArt);
             var hl = Prim(PrimitiveType.Quad, "Highlight", root.transform, new Vector3(0, 0, 0.012f), new Vector3(1.15f, 1.65f, 1f), Highlight);
+
+            float z = -0.006f;
+            // Coût (haut gauche) et valeur (bas droite) : ronds posés sur les coins de la bordure intérieure
+            var orb = Prim(PrimitiveType.Quad, "CostOrb", root.transform, new Vector3(-0.37f, 0.62f, -0.004f), new Vector3(0.2f, 0.2f, 1f), CostOrb);
+            view.costOrb = orb;
+            view.costOrbRenderer = orb.GetComponent<MeshRenderer>();
+            view.costText = Text3D(root.transform, "Cost", new Vector3(-0.37f, 0.625f, z), new Vector2(0.15f, 0.15f), "1", Palette.Bone, 1.8f, FontStyles.Bold, FontTitle);
+            var valueOrb = Prim(PrimitiveType.Quad, "ValueOrb", root.transform, new Vector3(0.37f, -0.62f, -0.004f), new Vector3(0.2f, 0.2f, 1f), CostOrb);
+            view.valueOrb = valueOrb;
+            view.valueOrbRenderer = valueOrb.GetComponent<MeshRenderer>();
+            view.valueText = Text3D(root.transform, "Value", new Vector3(0.37f, -0.615f, z), new Vector2(0.17f, 0.14f), "6", Palette.Bone, 1.6f, FontStyles.Bold, FontTitle);
+            view.valueText.textWrappingMode = TextWrappingModes.NoWrap;
             NoShadows(root);
             front.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
 
-            float z = -0.006f;
-            var orb = Prim(PrimitiveType.Quad, "CostOrb", root.transform, new Vector3(-0.39f, 0.63f, -0.005f), new Vector3(0.3f, 0.3f, 1f), CostOrb);
-            orb.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            view.costOrb = orb;
-            view.costText = Text3D(root.transform, "Cost", new Vector3(-0.39f, 0.635f, -0.008f), new Vector2(0.22f, 0.22f), "1", Palette.Bone, 2.2f, FontStyles.Bold, FontTitle);
-
-            view.nameText = Text3D(root.transform, "Name", new Vector3(0.07f, 0.6f, z), new Vector2(0.72f, 0.16f), "NOM", Palette.Bone, 1.25f, FontStyles.Normal, FontTitle);
-            view.arcanaText = Text3D(root.transform, "Arcana", new Vector3(0.36f, -0.09f, z), new Vector2(0.24f, 0.08f), "XIII", Palette.Ash, 0.6f, FontStyles.Normal, FontTitle);
-            view.typeText = Text3D(root.transform, "Type", new Vector3(-0.08f, -0.09f, z), new Vector2(0.6f, 0.08f), "TYPE", Palette.Ash, 0.6f, FontStyles.Normal, FontMono);
-            view.rulesText = Text3D(root.transform, "Rules", new Vector3(0, -0.42f, z), new Vector2(0.84f, 0.5f), "", Palette.Bone, 0.85f, FontStyles.Normal, FontBody);
+            // Textes agrandis : nom en haut, règles sous l'icône (au-dessus de la rangée des bonus)
+            view.nameText = Text3D(root.transform, "Name", new Vector3(0.07f, 0.615f, z), new Vector2(0.68f, 0.14f), "NOM", Palette.Bone, 1.6f, FontStyles.Bold, FontTitle);
+            view.nameText.fontSizeMin = 0.6f;
+            view.rulesText = Text3D(root.transform, "Rules", new Vector3(0, -0.28f, z), new Vector2(0.82f, 0.44f), "", Palette.Bone, 1.05f, FontStyles.Normal, FontBody);
+            view.rulesText.fontSizeMin = 0.45f;
             view.rulesText.lineSpacing = -10f;
 
             view.artLibrary = ArtLibrary;
             view.frameRenderer = front.GetComponent<MeshRenderer>();
-            view.artRenderer = art.GetComponent<MeshRenderer>();
             view.backRenderer = back.GetComponent<MeshRenderer>();
             view.highlight = hl;
             view.highlightRenderer = hl.GetComponent<MeshRenderer>();
@@ -183,10 +190,7 @@ namespace Lucidite.EditorTools
             Part("Sheets", props.transform, sheets, Paper, false);
             Part("OldStain", props.transform, new MeshBuilder().Ellipsoid(new Vector3(0.15f, 0.7802f, -0.24f), new Vector3(0.05f, 0.0005f, 0.038f), 2, 12, d => Vector3.one * (0.8f + Mathf.PerlinNoise(d.x * 3f + 5f, d.z * 3f) * 0.4f)), BloodPool, false);
 
-            // Piles de cartes (pioche)
-            var pile = new MeshBuilder();
-            for (int i = 0; i < 8; i++) pile.At(new Vector3(0.36f + Random.Range(-0.002f, 0.002f), 0.781f + i * 0.0015f, -0.06f), new Vector3(0, Random.Range(-3f, 3f), 0)).Box(Vector3.zero, new Vector3(0.068f, 0.0012f, 0.102f), 9f);
-            Part("PlayerDeckPile", root.transform, pile, CardBack, false);
+            // (pioche et défausse : PileView, créées avec le plateau dans LuciditeSetup)
             return SavePrefab(root, P("Table"));
         }
 
@@ -216,7 +220,7 @@ namespace Lucidite.EditorTools
             MeshStore.Begin("Lamp");
             var root = new GameObject("HangingLamp");
             var lamp = root.AddComponent<HangingLamp>();
-            float drop = 1.2f;
+            float drop = 1.32f; // un peu plus basse qu'avant (1.2) pour mieux la voir
             if (!TryImported("Lamp", root.transform))
             {
                 Part("CeilingRose", root.transform, new MeshBuilder().Lathe(new[] { V2(0.06f, 0f), V2(0.06f, -0.012f), V2(0.03f, -0.025f), V2(0.008f, -0.03f), V2(0f, -0.03f) }, 12), Metal);
@@ -245,7 +249,7 @@ namespace Lucidite.EditorTools
             spot.spotAngle = 120f;
             spot.innerSpotAngle = 70f;
             spot.range = 4.5f;
-            spot.intensity = 6f;
+            spot.intensity = 4f;
             spot.color = Palette.Bulb;
             spot.shadows = LightShadows.Soft;
             spot.shadowStrength = 0.9f;
@@ -255,7 +259,7 @@ namespace Lucidite.EditorTools
             var fill = fillGo.AddComponent<Light>();
             fill.type = LightType.Point;
             fill.range = 3.6f;
-            fill.intensity = 0.75f;
+            fill.intensity = 0.5f;
             fill.color = Palette.Bulb;
             fill.shadows = LightShadows.None;
 
@@ -267,9 +271,13 @@ namespace Lucidite.EditorTools
             lamp.fillLight = fill;
             lamp.bulbRenderer = br;
             lamp.cordLength = drop + 0.1f;
-            // Plus sobre : la table claire, vue en grand angle, saturait sous la lampe
-            lamp.spotIntensity = 6f;
-            lamp.fillIntensity = 0.75f;
+            lamp.idleSway = 1f;        // calme hors secousses (2.6° bougeait trop)
+            lamp.damping = 0.38f;      // avant 0.5 : se balance plus longtemps après un choc, sans osciller indéfiniment
+            lamp.impulseScale = 1.6f;
+            // Plus sobre : la table claire, vue en grand angle, saturait sous la lampe.
+            // Lampe descendue de 12 cm (0.65 -> 0.53 m de la table) : intensités x (0.53/0.65)² ≈ 0.67 pour garder le même éclairage
+            lamp.spotIntensity = 4f;
+            lamp.fillIntensity = 0.5f;
             return SavePrefab(root, P("HangingLamp")).GetComponent<HangingLamp>();
         }
 
@@ -461,11 +469,18 @@ namespace Lucidite.EditorTools
             var ps = go.AddComponent<ParticleSystem>();
             var main = ps.main;
             main.loop = false; main.playOnAwake = false; main.duration = 0.5f;
-            main.startLifetime = 2.2f; main.startSpeed = 0f; main.startSize = new ParticleSystem.MinMaxCurve(0.006f, 0.016f);
-            main.startColor = new Color(0.6f, 0.56f, 0.5f, 0.7f); main.gravityModifier = 0.35f;
+            // Plus grosse et plus claire qu'avant : visible dans la pénombre quand elle traverse la lumière de la lampe
+            main.startLifetime = new ParticleSystem.MinMaxCurve(1.8f, 3f); main.startSpeed = new ParticleSystem.MinMaxCurve(0f, 0.15f);
+            main.startSize = new ParticleSystem.MinMaxCurve(0.01f, 0.03f);
+            main.startColor = new ParticleSystem.MinMaxGradient(new Color(0.78f, 0.73f, 0.65f, 0.9f), new Color(0.55f, 0.5f, 0.45f, 0.75f));
+            main.gravityModifier = new ParticleSystem.MinMaxCurve(0.08f, 0.2f); main.maxParticles = 1500;
             main.simulationSpace = ParticleSystemSimulationSpace.World;
             var em = ps.emission; em.rateOverTime = 0f; em.SetBursts(new[] { new ParticleSystem.Burst(0f, 70) });
-            var sh = ps.shape; sh.shapeType = ParticleSystemShapeType.Box; sh.scale = new Vector3(1.6f, 0.02f, 1.4f);
+            // Boîte tournée de 90° (émission vers le bas) : X/Y de l'échelle = surface du plafond, Z = épaisseur.
+            // Toute la pièce (murs à ±2.13 m) pour donner l'impression d'un plafond qui s'effondre.
+            var sh = ps.shape; sh.shapeType = ParticleSystemShapeType.Box; sh.scale = new Vector3(3.9f, 3.9f, 0.02f);
+            sh.rotation = new Vector3(90f, 0f, 0f);
+            var noise = ps.noise; noise.enabled = true; noise.strength = 0.08f; noise.frequency = 0.6f; // tourbillonne en tombant
             go.GetComponent<ParticleSystemRenderer>().sharedMaterial = ParticleDust;
             return ps;
         }
@@ -606,7 +621,7 @@ namespace Lucidite.EditorTools
             var handAnchor = Empty("PlayerHand", tremor.transform, new Vector3(0, -0.125f, 0.385f), new Vector3(-8f, 0, 0));
             var hv = handAnchor.AddComponent<HandView>();
             hv.side = Side.Player;
-            hv.radius = 0.55f; hv.maxAngleStep = 8f; hv.maxSpread = 44f; hv.cardScale = 0.062f;
+            hv.radius = 0.55f; hv.maxAngleStep = 8f; hv.maxSpread = 44f; hv.cardScale = 0.066f;
             hv.hoverLift = 0.03f; hv.hoverForward = 0.08f; hv.hoverScale = 1.5f;
 
             var wounds = new List<(GameObject, Transform)>();
@@ -754,11 +769,12 @@ namespace Lucidite.EditorTools
             }
             view.head = head;
 
-            // Éventail tenu plus haut (au niveau de la poitrine), bien visible au-dessus de la table
-            var handAnchor = Empty("OpponentHand", torso.transform, new Vector3(0, 0.5f, 0.37f), new Vector3(8f, 0, 0)); // assez loin du buste pour que les avant-bras s'étendent
+            // Éventail tenu haut (sous le menton), ~17 cm au-dessus de la table : ses poignets et avant-bras
+            // restent au-dessus du plateau (OpponentArmsIK relève encore l'éventail quand elle se penche)
+            var handAnchor = Empty("OpponentHand", torso.transform, new Vector3(0, 0.6f, 0.32f), new Vector3(8f, 0, 0));
             var hv = handAnchor.AddComponent<HandView>();
             hv.side = Side.Opponent;
-            hv.radius = 0.45f; hv.maxAngleStep = 10f; hv.cardScale = 0.06f; hv.maxSpread = 50f;
+            hv.radius = 0.45f; hv.maxAngleStep = 10f; hv.cardScale = 0.062f; hv.maxSpread = 50f;
             var oppIk = root.GetComponent<OpponentArmsIK>();
             if (oppIk) oppIk.hand = hv;
 

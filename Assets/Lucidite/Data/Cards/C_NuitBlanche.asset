@@ -13,11 +13,14 @@ MonoBehaviour:
   m_Name: C_NuitBlanche
   m_EditorClassIdentifier: Assembly-CSharp::Lucidite.CardData
   cardName: Nuit blanche
-  arcana: III
+  arcana: XV
   type: 3
   rarity: 4
   theme: 7
   flavorText: "Les yeux qui br\xFBlent, la t\xEAte qui tourne."
+  icon: {fileID: 2800000, guid: ed4e57a8702c26747bde7dcf56b467f6, type: 3}
+  face: {fileID: 2800000, guid: 7fa2bdf5b6aff4c489604959bc82a80d, type: 3}
+  faceUpgraded: {fileID: 0}
   cost: 1
   unplayable: 0
   damage: 0

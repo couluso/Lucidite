@@ -498,7 +498,7 @@ namespace Lucidite.EditorTools
             for (int i = 0; i < 14; i++)
             {
                 float r = 0.006f + (float)rng.NextDouble() * 0.014f;
-                drops.Ellipsoid(new Vector3((float)rng.NextDouble() * 0.5f - 0.25f, 0.7808f, 0.38f + (float)rng.NextDouble() * 0.12f), new Vector3(r * 0.5f, 0.0006f, r * 0.6f), 2, 8);
+                drops.Ellipsoid(new Vector3((float)rng.NextDouble() * 0.5f - 0.25f, 0.7818f, 0.38f + (float)rng.NextDouble() * 0.12f), new Vector3(r * 0.5f, 0.0006f, r * 0.6f), 2, 8);
             }
             Part("TableBlood", opponentRoot, drops, BloodPool, false);
         }

@@ -25,11 +25,15 @@ namespace Lucidite
         public static readonly Color Bulb       = Hex("E8C48A"); // lumière de l'ampoule
         public static readonly Color Hope       = Hex("D9A441"); // accent : espoir / victoire
 
-        // Couleurs de type de carte
-        public static readonly Color TypeAttack  = Hex("8C1A1A");
-        public static readonly Color TypeDefense = Hex("4C5A66");
-        public static readonly Color TypeCrisis  = Hex("2A1E2E");
-        public static readonly Color TypeTorment = Hex("5B3A1E");
+        // Couleurs de type de carte (ternies pour rester dans l'ambiance : écarlate, bleu marine, violet, blanc os)
+        public static readonly Color TypeAttack  = Hex("9A2430");
+        public static readonly Color TypeDefense = Hex("2E5F86");
+        public static readonly Color TypeCrisis  = Hex("CFCAC0");
+        public static readonly Color TypeTorment = Hex("74569C");
+        public static readonly Color TypeEnemy   = Hex("6B1A1E"); // cartes de la Dépression : rouge sang sombre
+
+        /// <summary>Texte lisible sur un rond de la couleur du type.</summary>
+        public static Color OnType(Color typeColor) => typeColor.grayscale > 0.55f ? Void : Bone;
 
         public static Color ForType(CardType t)
         {

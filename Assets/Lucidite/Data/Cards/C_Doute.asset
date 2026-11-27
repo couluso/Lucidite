@@ -13,11 +13,14 @@ MonoBehaviour:
   m_Name: C_Doute
   m_EditorClassIdentifier: Assembly-CSharp::Lucidite.CardData
   cardName: Doute
-  arcana: I
+  arcana: XIII
   type: 3
   rarity: 4
   theme: 1
   flavorText: Et si tu n'y arrivais jamais ?
+  icon: {fileID: 2800000, guid: 1816ab57c5c7a1246bbfa09031a71e60, type: 3}
+  face: {fileID: 2800000, guid: 4a09f5119a160a64c9d55c135220d554, type: 3}
+  faceUpgraded: {fileID: 0}
   cost: 0
   unplayable: 1
   damage: 0

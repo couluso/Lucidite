@@ -18,6 +18,9 @@ MonoBehaviour:
   rarity: 0
   theme: 11
   flavorText: Le plus dur, c'est de poser un pied par terre.
+  icon: {fileID: 2800000, guid: 59d58cacbd1d79a448adbfa2e906ca78, type: 3}
+  face: {fileID: 2800000, guid: 9c479c0cc87d3c742b9d678967cb2ef0, type: 3}
+  faceUpgraded: {fileID: 0}
   cost: 1
   unplayable: 0
   damage: 6

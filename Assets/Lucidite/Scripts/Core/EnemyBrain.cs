@@ -82,6 +82,8 @@ namespace Lucidite
     /// </summary>
     public class EnemyProgress
     {
+        /// <summary>Ses gouttes de sang : gagnées comme la joueuse, dépensées en secret dans sa "boutique".</summary>
+        public int blood;
         public int bonusMaxHp;
         public int startStrength;
         public int bonusEnergy;
@@ -179,53 +181,131 @@ namespace Lucidite
             };
         }
 
+        // ================================================================== Ses pilules
+
+        public const int MaxRelics = 4, MaxPills = 3;
+
+        /// <summary>Au début du tour de la joueuse, elle avale parfois une pilule (une au plus par tour).</summary>
+        public OwnedItem ChoosePill(Fighter self, Fighter foe, List<EnemyIntent> plan)
+        {
+            if (self == null || self.items.Count == 0) return null;
+            int dmg = 0, firstDmg = 0, lastDmg = 0;
+            if (plan != null) foreach (var it in plan) dmg += it.TotalDamage(self, foe);
+            if (plan != null && plan.Count >= 2) { firstDmg = plan[0].TotalDamage(self, foe); lastDmg = plan[plan.Count - 1].TotalDamage(self, foe); }
+            foreach (var o in self.items)
+            {
+                bool use;
+                switch (o.data.effect)
+                {
+                    case ItemEffect.Soigner: use = self.hp * 2 <= self.maxHp; break;
+                    case ItemEffect.SaignementReduitTour: use = self.hp * 5 <= self.maxHp * 3 && Random.value < 0.45f; break;
+                    case ItemEffect.SaignementAdverseTour: use = dmg >= 10 && Random.value < 0.5f; break;
+                    case ItemEffect.GagnerForce: use = dmg > 0 && Random.value < 0.45f; break;
+                    case ItemEffect.GagnerBouclier: use = Random.value < 0.35f; break;
+                    case ItemEffect.AppliquerVulnerable: use = dmg > 0 && Random.value < 0.4f; break;
+                    case ItemEffect.AppliquerFaiblesse: use = Random.value < 0.35f; break;
+                    case ItemEffect.GagnerEnergie: use = Random.value < 0.55f; break;
+                    case ItemEffect.EnergieAdverseTour: use = foe.hand.Count >= 3 && Random.value < 0.5f; break;
+                    case ItemEffect.CopierCarte: use = firstDmg > lastDmg && Random.value < 0.7f; break;
+                    case ItemEffect.Voler: use = (foe.relics.Count > 0 && self.relics.Count < MaxRelics) || (foe.items.Count > 0 && Random.value < 0.4f); break;
+                    case ItemEffect.Purifier: use = self.weak + self.vulnerable >= 2; break;
+                    case ItemEffect.Placebo: use = Random.value < 0.3f; break;
+                    default: use = false; break;
+                }
+                if (use) return o;
+            }
+            return null;
+        }
+
         // ================================================================== Sa "boutique"
 
         /// <summary>
-        /// Entre deux manches, la Dépression se renforce comme si elle passait elle aussi par la boutique.
-        /// Renvoie la liste de ses achats (pour l'annoncer à la joueuse).
+        /// Entre deux manches, la Dépression dépense ses gouttes de sang comme si elle passait elle aussi
+        /// par la boutique (achats tenus secrets). Renvoie la liste de ses achats.
         /// </summary>
-        public List<string> Shop(int purchases, int round)
+        public List<string> Shop(GameConfig cfg, int round, Fighter self, List<ItemData> items, System.Action<ItemData> onBought)
         {
             var bought = new List<string>();
-            for (int i = 0; i < purchases; i++)
+            while (true)
             {
-                var options = new List<System.Func<string>>
+                // Reliques (statuettes posées de son côté) et pilules : elle les achète au même prix que toi
+                var relicChoices = new List<ItemData>();
+                var pillChoices = new List<ItemData>();
+                if (items != null && self != null)
+                    foreach (var i in items)
+                    {
+                        if (i == null || !i.enemyCanBuy) continue;
+                        if (i.rare && Random.value > 0.25f) continue;
+                        if (i.kind == ItemKind.Relique)
+                        {
+                            // Le Reliquaire n'a de sens qu'avec une autre relique à magnifier
+                            if (i.effect == ItemEffect.Reliquaire && GameManager.RandomOtherRelic(self, i) == null) continue;
+                            if (!self.relics.Contains(i) && self.relics.Count < MaxRelics) relicChoices.Add(i);
+                        }
+                        else if (self.items.Count < MaxPills) pillChoices.Add(i);
+                    }
+                System.Func<ItemData, System.Func<string>> buyItem = i => () =>
                 {
-                    () => { progress.bonusMaxHp += 10; return "Insomnie chronique : +10 Emprise maximale."; },
-                    () => { progress.startStrength += 1; return "Rancune : commence chaque manche avec +1 Force."; },
-                    () => { progress.startBlock += 8; return "Carapace d'apathie : commence chaque manche avec 8 Bouclier."; }
+                    if (i.kind == ItemKind.Relique)
+                    {
+                        self.relics.Add(i);
+                        if (i.effect == ItemEffect.Reliquaire) self.buffTarget = GameManager.RandomOtherRelic(self, i);
+                    }
+                    else self.items.Add(new OwnedItem(i));
+                    onBought?.Invoke(i);
+                    return i.kind == ItemKind.Relique ? $"Relique : {i.itemName}." : $"Pilule : {i.itemName}.";
                 };
-                if (progress.bonusEnergy < 2 && round >= 2)
-                    options.Add(() => { progress.bonusEnergy += 1; return "Ruminations : +1 énergie par tour (elle joue plus de cartes)."; });
 
-                // Affûter une de ses cartes
+                var options = new List<(int price, System.Func<string> buy)>
+                {
+                    (cfg.enemyPriceHp, () => { progress.bonusMaxHp += cfg.enemyPerkHp; return $"Insomnie chronique : +{cfg.enemyPerkHp} Emprise maximale."; }),
+                    (cfg.enemyPriceStrength, () => { progress.startStrength += 1; return "Rancune : commence chaque manche avec +1 Force."; }),
+                    (cfg.enemyPriceBlock, () => { progress.startBlock += cfg.enemyPerkBlock; return $"Carapace d'apathie : +{cfg.enemyPerkBlock} Bouclier en début de manche."; })
+                };
+                bool energyOffered = progress.bonusEnergy < cfg.enemyMaxBonusEnergy && round >= 2;
+                if (energyOffered)
+                    options.Add((cfg.enemyPriceEnergy, () => { progress.bonusEnergy += 1; return "Ruminations : +1 énergie par tour (elle joue plus de cartes)."; }));
+
+                // Affûter une de ses cartes (au plus deux fois la même)
                 var sharpen = new List<EnemyMoveData>();
-                foreach (var m in _moves) if (Available(m, round + 1) && m.damage > 0) sharpen.Add(m);
+                foreach (var m in _moves)
+                    if (Available(m, round + 1) && m.damage > 0 && (!progress.moveBonus.TryGetValue(m, out var b) || b < cfg.enemyPerkSharpen * 1.5f))
+                        sharpen.Add(m);
                 if (sharpen.Count > 0)
-                    options.Add(() =>
+                    options.Add((cfg.enemyPriceSharpen, () =>
                     {
                         var m = sharpen[Random.Range(0, sharpen.Count)];
                         progress.moveBonus.TryGetValue(m, out var b);
-                        progress.moveBonus[m] = b + 0.3f;
-                        return $"Affûte « {m.moveName} » : +30 % de dégâts.";
-                    });
+                        progress.moveBonus[m] = b + cfg.enemyPerkSharpen;
+                        return $"Affûte « {m.moveName} » : +{Mathf.RoundToInt(cfg.enemyPerkSharpen * 100f)} % de dégâts.";
+                    }));
 
                 // Nouvelle obsession : une carte exclusive
                 var locked = new List<EnemyMoveData>();
                 foreach (var m in _moves) if (m && m.shopOnly && !progress.unlocked.Contains(m) && m.minRound <= round + 1) locked.Add(m);
                 if (locked.Count > 0)
                 {
-                    options.Add(() =>
+                    System.Func<string> unlock = () =>
                     {
                         var m = locked[Random.Range(0, locked.Count)];
                         progress.unlocked.Add(m);
                         return $"Nouvelle obsession : « {m.moveName} » rejoint ses cartes.";
-                    });
-                    options.Add(options[options.Count - 1]); // plus de chances d'obtenir une nouvelle carte
+                    };
+                    options.Add((cfg.enemyPriceNewMove, unlock));
+                    options.Add((cfg.enemyPriceNewMove, unlock)); // plus de chances d'obtenir une nouvelle carte
                 }
 
-                var text = options[Random.Range(0, options.Count)]();
+                if (relicChoices.Count > 0) { var r = relicChoices[Random.Range(0, relicChoices.Count)]; options.Add((r.price, buyItem(r))); }
+                if (pillChoices.Count > 0) { var p = pillChoices[Random.Range(0, pillChoices.Count)]; options.Add((p.price, buyItem(p))); }
+
+                var affordable = options.FindAll(o => o.price <= progress.blood);
+                if (affordable.Count == 0) break;
+                // Une fois sur deux, elle économise pour l'énergie quand elle ne peut pas encore se la payer
+                if (energyOffered && progress.blood < cfg.enemyPriceEnergy && Random.value < 0.5f) break;
+
+                var pick = affordable[Random.Range(0, affordable.Count)];
+                progress.blood -= pick.price;
+                var text = pick.buy();
                 bought.Add(text);
                 progress.log.Add(text);
             }

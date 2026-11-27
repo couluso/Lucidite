@@ -16,6 +16,8 @@ MonoBehaviour:
   arcana: XVI
   theme: 0
   flavorText: "Tu croyais que c'\xE9tait fini."
+  icon: {fileID: 2800000, guid: 370ed1d37c67e1d48a3aca95743e74e0, type: 3}
+  face: {fileID: 2800000, guid: 94e14b4fbf58dbc448855fe240a9bdde, type: 3}
   damage: 7
   hits: 1
   block: 0

@@ -35,13 +35,20 @@ Material:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _SuitMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
     - _Affine: 0.7
     - _Cull: 2
     - _Cutoff: 0.5
     - _Damage: 0
+    - _DamageGlow: 0
+    - _DamageMix: 1
     - _Jitter: 1
+    - _SuitMix: 0
     - _Wrap: 0.25
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}

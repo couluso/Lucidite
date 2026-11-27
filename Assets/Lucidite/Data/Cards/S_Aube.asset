@@ -18,6 +18,9 @@ MonoBehaviour:
   rarity: 3
   theme: 12
   flavorText: La nuit finit toujours par finir.
+  icon: {fileID: 2800000, guid: 70e8c0b7c0e54424e95d0a58ff237a4f, type: 3}
+  face: {fileID: 2800000, guid: 680d812f303e9bd44a99e9dd420ce69a, type: 3}
+  faceUpgraded: {fileID: 0}
   cost: 2
   unplayable: 0
   damage: 24

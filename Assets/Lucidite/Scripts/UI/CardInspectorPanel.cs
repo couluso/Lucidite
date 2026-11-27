@@ -20,6 +20,9 @@ namespace Lucidite
         public TMP_Text flavorText;
         public TMP_Text costText;
         public GameObject costRoot;
+        [Tooltip("Pastille de classe (symbole blanc sur rond noir) en bas à droite du coût.")]
+        public GameObject suitRoot;
+        public RawImage suitIcon;
 
         CardView _hovered;
         bool _textMode;
@@ -42,13 +45,17 @@ namespace Lucidite
             var d = c.data;
             var gm = GameManager.Instance;
             titleText.text = c.Name;
-            subtitleText.text = $"{CardData.TypeLabel(d.type)}  ·  {CardData.RarityLabel(d.rarity)}  ·  {CardData.ThemeLabel(d.theme)}";
+            string suit = c.suit != CardSuit.Aucune ? $"  ·  {CardData.SuitLabel(c.suit).ToUpper()}" + (c.Level > 0 ? $" niv. {c.Level}" : "") : "";
+            subtitleText.text = $"{CardData.TypeLabel(d.type)}{suit}  ·  {CardData.RarityLabel(d.rarity)}  ·  {CardData.ThemeLabel(d.theme)}";
             rulesText.text = inCombat && gm && gm.Player != null ? c.Describe(gm.Player, gm.Enemy) : c.Describe();
             keywordsText.text = Keywords(c);
             flavorText.text = d.flavorText;
             if (costRoot) costRoot.SetActive(!c.Unplayable);
             if (costText) costText.text = c.Cost.ToString();
-            if (art) { art.gameObject.SetActive(true); if (artLibrary) art.texture = artLibrary.Get(d.theme); }
+            bool hasSuit = c.suit != CardSuit.Aucune && artLibrary && artLibrary.SuitIcon(c.suit);
+            if (suitRoot) suitRoot.SetActive(hasSuit);
+            if (hasSuit && suitIcon) suitIcon.texture = artLibrary.SuitIcon(c.suit);
+            if (art) { art.gameObject.SetActive(true); if (artLibrary) art.texture = artLibrary.Icon(d.icon); art.color = Palette.ForType(d.type); }
             Show();
         }
 
@@ -61,7 +68,8 @@ namespace Lucidite
             keywordsText.text = it.weak > 0 || it.vulnerable > 0 || it.crisis > 0 ? Glossary(it.weak > 0, it.vulnerable > 0, false, false, false, it.crisis > 0) : "";
             flavorText.text = it.move.flavorText;
             if (costRoot) costRoot.SetActive(false);
-            if (art) { art.gameObject.SetActive(true); if (artLibrary) art.texture = artLibrary.Get(it.move.theme); }
+            if (suitRoot) suitRoot.SetActive(false);
+            if (art) { art.gameObject.SetActive(true); if (artLibrary) art.texture = artLibrary.Icon(it.move.icon); art.color = Palette.TypeEnemy; }
             Show();
         }
 
@@ -74,6 +82,7 @@ namespace Lucidite
             keywordsText.text = "";
             flavorText.text = "";
             if (costRoot) costRoot.SetActive(false);
+            if (suitRoot) suitRoot.SetActive(false);
             if (art) art.gameObject.SetActive(false);
             Show();
         }

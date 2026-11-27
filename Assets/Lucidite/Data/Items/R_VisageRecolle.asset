@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 594c91d710cdb234fbf68a6cef67b53c, type: 3}
+  m_Name: R_VisageRecolle
+  m_EditorClassIdentifier: Assembly-CSharp::Lucidite.ItemData
+  itemName: "Visage recoll\xE9"
+  kind: 0
+  effect: 0
+  value: 10
+  price: 105
+  flavorText: "Bris\xE9, puis r\xE9par\xE9 \xE0 l'or. Les f\xEAlures se voient ; c'est le but."
+  tint: {r: 0.8509804, g: 0.827451, b: 0.7764706, a: 1}
+  model: {fileID: 2240384062089429614, guid: 24ba578f8e8d7004a8fb8042f022254c, type: 3}
+  enemyCanBuy: 1
+  rare: 0

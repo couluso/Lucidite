@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 594c91d710cdb234fbf68a6cef67b53c, type: 3}
+  m_Name: R_Lacrymatoire
+  m_EditorClassIdentifier: Assembly-CSharp::Lucidite.ItemData
+  itemName: Lacrymatoire
+  kind: 0
+  effect: 5
+  value: 15
+  price: 80
+  flavorText: "Une fiole pour garder ses larmes. La tienne d\xE9borde."
+  tint: {r: 0.5411765, g: 0.101960786, b: 0.101960786, a: 1}
+  model: {fileID: 8454028887028919863, guid: a7b3e2c5e7c2b29448c4c1c700fad84e, type: 3}
+  enemyCanBuy: 1
+  rare: 0

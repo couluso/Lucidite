@@ -13,11 +13,14 @@ MonoBehaviour:
   m_Name: C_Honte
   m_EditorClassIdentifier: Assembly-CSharp::Lucidite.CardData
   cardName: Honte
-  arcana: IV
+  arcana: XVI
   type: 3
   rarity: 4
   theme: 4
   flavorText: Tu baisses les yeux, encore.
+  icon: {fileID: 2800000, guid: c87f1f141c9bf214aaa41680ca2ad06d, type: 3}
+  face: {fileID: 2800000, guid: 4d479f05905bc0f46a59e82289c47cb4, type: 3}
+  faceUpgraded: {fileID: 0}
   cost: 0
   unplayable: 1
   damage: 0

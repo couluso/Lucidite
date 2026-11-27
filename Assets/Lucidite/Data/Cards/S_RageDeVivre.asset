@@ -18,6 +18,9 @@ MonoBehaviour:
   rarity: 2
   theme: 11
   flavorText: "Pas comme \xE7a. Pas maintenant."
+  icon: {fileID: 2800000, guid: dc655ec931b8906408dcbcac77979e7c, type: 3}
+  face: {fileID: 2800000, guid: ec4451c2088d9974cb495cf5c8d98a93, type: 3}
+  faceUpgraded: {fileID: 0}
   cost: 2
   unplayable: 0
   damage: 14

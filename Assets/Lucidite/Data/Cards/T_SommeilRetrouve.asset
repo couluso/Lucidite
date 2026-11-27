@@ -13,11 +13,14 @@ MonoBehaviour:
   m_Name: T_SommeilRetrouve
   m_EditorClassIdentifier: Assembly-CSharp::Lucidite.CardData
   cardName: "Sommeil retrouv\xE9"
-  arcana: VII
+  arcana: XIX
   type: 2
   rarity: 2
   theme: 12
   flavorText: "Une nuit enti\xE8re. Enfin."
+  icon: {fileID: 2800000, guid: ba6be1cc9844b0c429dc1d85a33f37b5, type: 3}
+  face: {fileID: 2800000, guid: cf5aa95dea7df834c87083429efabad4, type: 3}
+  faceUpgraded: {fileID: 0}
   cost: 1
   unplayable: 0
   damage: 0

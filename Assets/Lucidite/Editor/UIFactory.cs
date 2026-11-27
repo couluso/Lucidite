@@ -183,42 +183,55 @@ namespace Lucidite.EditorTools
         // ================================================================== Cartes / objets UI
         public static CardUIView CardUI(string name, float s)
         {
+            // Même design que la carte 3D : la face de la carte (icône et bonus compris) + textes, coût et valeur.
+            // Repères en pixels de la face (256 x 384, origine en bas à gauche).
+            float k = 220f * s / 256f;
             var root = UIObj(name, null);
             ((RectTransform)root.transform).sizeDelta = new Vector2(220, 330) * s;
             var view = root.AddComponent<CardUIView>();
-            var frame = root.AddComponent<Image>();
-            frame.sprite = SpriteCardFrame;
-            frame.color = Color.white;
-            view.frame = frame;
+            var face = root.AddComponent<RawImage>();
+            face.texture = ArtLibrary.faceAttack;
+            view.face = face;
+            // Classe : symbole sous le coût + motif de fond, par-dessus la face
+            var suitGo = UIObj("Suit", root.transform);
+            Stretch(suitGo);
+            view.suitOverlay = suitGo.AddComponent<RawImage>();
+            view.suitOverlay.raycastTarget = false;
+            suitGo.SetActive(false);
             var btn = root.AddComponent<Button>();
-            btn.targetGraphic = frame;
+            btn.targetGraphic = face;
             var cb = btn.colors; cb.highlightedColor = new Color(1f, 0.92f, 0.85f); cb.pressedColor = Palette.BloodLight; cb.disabledColor = new Color(0.45f, 0.42f, 0.4f); btn.colors = cb;
             view.button = btn;
 
-            var top = new Vector2(0.5f, 1f);
-            var dark = Img(root.transform, "Ink", Palette.Hex("120E0E").WithAlpha(0.86f));
-            Stretch(dark.gameObject, 14 * s, 14 * s, 14 * s, 14 * s);
-            view.typeBand = Img(root.transform, "TypeBand", Palette.TypeAttack);
-            Place(view.typeBand, top, top, new Vector2(0, -14 * s), new Vector2(192 * s, 5 * s));
-            view.nameText = Txt(root.transform, "Name", "Nom", 22 * s, Palette.Bone, FontTitle, TextAlignmentOptions.Center, true);
-            Place(view.nameText, top, top, new Vector2(10 * s, -20 * s), new Vector2(160 * s, 40 * s));
-            var artGo = UIObj("Art", root.transform);
-            Place(artGo, top, top, new Vector2(0, -62 * s), new Vector2(150 * s, 112 * s));
-            view.art = artGo.AddComponent<RawImage>();
-            view.art.raycastTarget = false;
-            view.art.uvRect = new Rect(0, 0.12f, 1, 0.76f);
-            view.typeText = Txt(root.transform, "Type", "TYPE", 15 * s, Palette.Ash, FontMono, TextAlignmentOptions.Center);
-            Place(view.typeText, top, top, new Vector2(0, -176 * s), new Vector2(190 * s, 20 * s));
-            view.rulesText = Txt(root.transform, "Rules", "", 15 * s, Palette.Bone, FontBody, TextAlignmentOptions.Top, true);
-            Place(view.rulesText, top, top, new Vector2(0, -198 * s), new Vector2(180 * s, 92 * s));
+            var zero = Vector2.zero;
+            var mid = new Vector2(0.5f, 0.5f);
+            RectTransform At(Component c, float x, float y, float w, float h) => Place(c, zero, mid, new Vector2(x, y) * k, new Vector2(w, h) * k);
+            RawImage Raw(string n, Texture2D tex, float x, float y, float w, float h)
+            {
+                var g = UIObj(n, root.transform);
+                var r = g.AddComponent<RawImage>();
+                r.texture = tex; r.raycastTarget = false;
+                At(r, x, y, w, h);
+                return r;
+            }
+
+            view.nameText = Txt(root.transform, "Name", "Nom", 24 * s, Palette.Bone, FontTitle, TextAlignmentOptions.Center, true);
+            view.nameText.fontStyle = FontStyles.Bold;
+            At(view.nameText, 146, 349, 174, 36);
+            view.rulesText = Txt(root.transform, "Rules", "", 17 * s, Palette.Bone, FontBody, TextAlignmentOptions.Center, true);
+            At(view.rulesText, 128, 120, 210, 112);
             view.footerText = Txt(root.transform, "Footer", "", 24 * s, Palette.BloodLight, FontMono, TextAlignmentOptions.Center);
             Place(view.footerText, new Vector2(0.5f, 0f), new Vector2(0.5f, 1f), new Vector2(0, -4 * s), new Vector2(200 * s, 30 * s));
 
-            var orb = Img(root.transform, "CostOrb", Palette.BloodDark, SpriteOrb);
-            Place(orb, new Vector2(0, 1), new Vector2(0.5f, 0.5f), new Vector2(26 * s, -28 * s), new Vector2(44 * s, 44 * s));
-            view.costRoot = orb.gameObject;
-            view.costText = Txt(orb.transform, "Cost", "1", 28 * s, Palette.Bone, FontTitle);
+            view.costOrb = Raw("CostOrb", ArtLibrary.orb, 33, 351, 51, 51);
+            view.costRoot = view.costOrb.gameObject;
+            view.costText = Txt(view.costOrb.transform, "Cost", "1", 22 * s, Palette.Bone, FontTitle);
             Stretch(view.costText.gameObject);
+            view.valueOrb = Raw("ValueOrb", ArtLibrary.orb, 223, 33, 51, 51);
+            view.valueRoot = view.valueOrb.gameObject;
+            view.valueText = Txt(view.valueOrb.transform, "Value", "6", 20 * s, Palette.Bone, FontTitle, TextAlignmentOptions.Center, true);
+            view.valueText.textWrappingMode = TextWrappingModes.NoWrap;
+            Stretch(view.valueText.gameObject, 3 * s, 3 * s, 3 * s, 3 * s);
 
             var sel = Img(root.transform, "Selected", Palette.Hope.WithAlpha(0.15f));
             Stretch(sel.gameObject);
@@ -243,6 +256,7 @@ namespace Lucidite.EditorTools
 
             ui.icon = Img(root.transform, "Icon", Palette.Blood, SpriteOrb);
             ui.icon.preserveAspect = true;
+            ui.preview = Preview(root.transform, compact ? new Vector2(0, 6) : new Vector2(10 + 32, 0), compact ? new Vector2(60, 46) : new Vector2(64, 64), compact ? new Vector2(0.5f, 0.5f) : new Vector2(0, 0.5f));
             if (compact)
             {
                 Place(ui.icon, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 6), new Vector2(46, 46));
@@ -259,6 +273,48 @@ namespace Lucidite.EditorTools
                 ui.footerText = Txt(root.transform, "Footer", "", 26, Palette.BloodLight, FontMono, TextAlignmentOptions.Right);
                 Place(ui.footerText, new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(-10, -14), new Vector2(70, 30));
             }
+            return SavePrefab(root, P(name)).GetComponent<ItemSlotUI>();
+        }
+
+        /// <summary>Aperçu (gélule ou statuette) gardant les proportions de son image dans un cadre.</summary>
+        static RawImage Preview(Transform parent, Vector2 pos, Vector2 size, Vector2 anchor)
+        {
+            var frame = UIObj("PreviewFrame", parent);
+            Place(frame, anchor, new Vector2(0.5f, 0.5f), pos, size);
+            var g = UIObj("Preview", frame.transform);
+            var r = g.AddComponent<RawImage>();
+            r.raycastTarget = false;
+            var fit = g.AddComponent<AspectRatioFitter>();
+            fit.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
+            fit.aspectRatio = 1f;
+            g.SetActive(false);
+            return r;
+        }
+
+        /// <summary>Offre de la boutique (pilule ou relique) : grand aperçu, nom, effet, prix.</summary>
+        public static ItemSlotUI GoodUI(string name)
+        {
+            var root = UIObj(name, null);
+            ((RectTransform)root.transform).sizeDelta = new Vector2(176, 236);
+            var hit = root.AddComponent<Image>();
+            hit.color = Palette.Void.WithAlpha(0.45f);
+            var ui = root.AddComponent<ItemSlotUI>();
+            var btn = root.AddComponent<Button>();
+            btn.targetGraphic = hit;
+            var cb = btn.colors; cb.normalColor = Color.white; cb.highlightedColor = new Color(1.6f, 0.9f, 0.9f); cb.disabledColor = new Color(1, 1, 1, 0.35f); btn.colors = cb;
+            ui.button = btn;
+            ui.showTooltip = false; // l'offre écrit déjà sa description
+            var top = new Vector2(0.5f, 1f);
+            ui.icon = Img(root.transform, "Icon", Palette.Blood, SpriteOrb);
+            ui.icon.preserveAspect = true;
+            Place(ui.icon, top, new Vector2(0.5f, 0.5f), new Vector2(0, -60), new Vector2(60, 60));
+            ui.preview = Preview(root.transform, new Vector2(0, -62), new Vector2(150, 110), top);
+            ui.nameText = Txt(root.transform, "Name", "", 20, Palette.Bone, FontTitle, TextAlignmentOptions.Center, true);
+            Place(ui.nameText, top, top, new Vector2(0, -120), new Vector2(166, 28));
+            ui.descText = Txt(root.transform, "Desc", "", 13, Palette.Ash, FontBody, TextAlignmentOptions.Top, true);
+            Place(ui.descText, top, top, new Vector2(0, -150), new Vector2(162, 52));
+            ui.footerText = Txt(root.transform, "Footer", "", 26, Palette.BloodLight, FontMono, TextAlignmentOptions.Center);
+            Place(ui.footerText, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0, 4), new Vector2(160, 30));
             return SavePrefab(root, P(name)).GetComponent<ItemSlotUI>();
         }
 
@@ -281,7 +337,7 @@ namespace Lucidite.EditorTools
         }
 
         // ================================================================== Interface complète
-        public static UIManager GameUI(CardUIView offerCard, CardUIView smallCard, ItemSlotUI itemOffer, ItemSlotUI itemButton)
+        public static UIManager GameUI(CardUIView offerCard, CardUIView smallCard, ItemSlotUI good, ItemSlotUI itemButton)
         {
             var root = new GameObject("GameUI", typeof(RectTransform));
             root.layer = 5;
@@ -302,7 +358,7 @@ namespace Lucidite.EditorTools
             ui.toast = BuildToast(t, "Toast", 30, new Vector2(0, 170), Palette.Bone, FontBody, 2.6f);
             ui.banner = BuildToast(t, "Banner", 64, new Vector2(0, 60), Palette.BloodLight, FontMono, 1.3f);
             ui.title = BuildTitle(t);
-            ui.shop = BuildShop(t, offerCard, itemOffer);
+            ui.shop = BuildShop(t, offerCard, good, itemButton);
             ui.deckPicker = BuildDeckPicker(t, smallCard);
             ui.shop.deckPicker = ui.deckPicker;
             ui.deck = BuildDeckViewer(t, smallCard);
@@ -392,17 +448,15 @@ namespace Lucidite.EditorTools
             hud.energyText = Txt(hud.energyOrb.transform, "Value", "3/3", 40, Palette.Void, FontTitle);
             Stretch(hud.energyText.gameObject);
 
-            // Objets
-            var items = UIObj("Items", t);
-            Place(items, bl, bl, new Vector2(180, 196), new Vector2(400, 72));
-            HList(items, 6, TextAnchor.MiddleLeft);
-            hud.itemsContainer = items.transform;
-            hud.itemButtonPrefab = itemButton;
+            // Les pilules ne sont plus dans le HUD : elles sont dans le pilulier posé sur la table
 
             // Fin du tour et piles (bas droite)
             hud.endTurnButton = MenuItem(t, "EndTurn", "FINIR LE TOUR  [E]", 34, new Vector2(420, 64), TextAlignmentOptions.Right, FontMono);
             Place(hud.endTurnButton, br, br, new Vector2(-40, 70), new Vector2(420, 64));
             hud.endTurnLabel = hud.endTurnButton.GetComponentInChildren<TMP_Text>();
+            // Tri de la main (les cartes sont jouées de gauche à droite ; on peut aussi les faire glisser)
+            hud.sortButton = MenuItem(t, "SortHand", "TRIER LA MAIN  [T]", 24, new Vector2(320, 40), TextAlignmentOptions.Right, FontMono);
+            Place(hud.sortButton, br, br, new Vector2(-40, 140), new Vector2(320, 40));
             hud.drawPileButton = MenuItem(t, "DrawPile", "pioche 0", 22, new Vector2(200, 30), TextAlignmentOptions.Right, FontMono);
             Place(hud.drawPileButton, br, br, new Vector2(-250, 24), new Vector2(200, 30));
             hud.drawPileText = hud.drawPileButton.GetComponentInChildren<TMP_Text>();
@@ -432,6 +486,15 @@ namespace Lucidite.EditorTools
             p.costRoot = orb.gameObject;
             p.costText = Txt(orb.transform, "Cost", "1", 40, Palette.Bone, FontTitle);
             Stretch(p.costText.gameObject);
+            // Classe : symbole blanc sur un rond noir, en bas à droite du coût
+            var suitDisc = Img(b, "SuitBadge", Color.black, SpriteOrb);
+            Place(suitDisc, anchor, new Vector2(0.5f, 0.5f), new Vector2(-440 + 30, 330 - 30), new Vector2(38, 38));
+            p.suitRoot = suitDisc.gameObject;
+            var suitIco = UIObj("SuitIcon", suitDisc.transform);
+            Place(suitIco, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(26, 26));
+            p.suitIcon = suitIco.AddComponent<RawImage>();
+            p.suitIcon.raycastTarget = false;
+            suitDisc.gameObject.SetActive(false);
             p.titleText = Title(b, "Title", "", 46, Palette.Bone, TextAlignmentOptions.Right);
             Place(p.titleText, anchor, new Vector2(1, 0.5f), new Vector2(-60, 180), new Vector2(480, 60));
             p.subtitleText = Mono(b, "Subtitle", "", 22, Palette.Ash, TextAlignmentOptions.Right);
@@ -498,44 +561,112 @@ namespace Lucidite.EditorTools
             return p;
         }
 
-        static ShopPanel BuildShop(Transform parent, CardUIView offerCard, ItemSlotUI itemOffer)
+        /// <summary>Titre de section : petites capitales rouges et un trait.</summary>
+        static TextMeshProUGUI Section(Transform t, string name, string label, Vector2 pos, float width)
+        {
+            var mid = new Vector2(0.5f, 0.5f);
+            var s = Mono(t, name, label, 30, Palette.BloodLight, TextAlignmentOptions.BottomLeft);
+            s.characterSpacing = 12f;
+            Place(s, mid, new Vector2(0f, 0f), pos, new Vector2(width, 40));
+            var line = Img(t, name + "Line", Palette.BloodLight.WithAlpha(0.35f));
+            Place(line, mid, new Vector2(0f, 1f), pos + new Vector2(0, -2), new Vector2(width, 2));
+            return s;
+        }
+
+        static TextMeshProUGUI SectionInfo(Transform t, string name, Vector2 pos, float width)
+        {
+            var mid = new Vector2(0.5f, 0.5f);
+            var s = Mono(t, name, "", 20, Palette.Ash, TextAlignmentOptions.BottomRight);
+            Place(s, mid, new Vector2(1f, 0f), pos + new Vector2(width, 2), new Vector2(width, 30));
+            return s;
+        }
+
+        static ShopPanel BuildShop(Transform parent, CardUIView offerCard, ItemSlotUI good, ItemSlotUI ownedPill)
         {
             var p = Panel<ShopPanel>(parent, "Shop");
-            Shade(p.transform, 0.78f);
+            Shade(p.transform, 0.86f);
             p.offerCardPrefab = offerCard;
-            p.itemOfferPrefab = itemOffer;
-            var t = p.transform;
+            p.goodPrefab = good;
+            p.ownedPillPrefab = ownedPill;
+            // Tout le contenu dans un bloc de 1840 x 1040 mis à l'échelle de l'écran : rien ne se chevauche
+            var content = UIObj("Content", p.transform);
+            content.AddComponent<UIFitInParent>().designSize = new Vector2(1840, 1040);
+            var t = content.transform;
             var top = new Vector2(0.5f, 1);
+            var mid = new Vector2(0.5f, 0.5f);
+            var bottom = new Vector2(0.5f, 0f);
 
-            var title = Title(t, "Header", "Entre deux manches", 64, Palette.Bone);
-            Place(title, top, top, new Vector2(0, -50), new Vector2(1200, 80));
+            var title = Title(t, "Header", "Entre deux manches", 60, Palette.Bone);
+            Place(title, top, top, new Vector2(0, -24), new Vector2(1200, 76));
             p.bloodText = Mono(t, "Blood", "0 gouttes de sang", 34, Palette.BloodLight);
-            Place(p.bloodText, top, top, new Vector2(0, -130), new Vector2(800, 40));
+            Place(p.bloodText, top, top, new Vector2(0, -104), new Vector2(800, 40));
 
+            // ---- Gauche : cartes (avec leur classe) puis services
+            const float lx = -880f, lw = 820f;
+            Section(t, "CardsTitle", "CARTES", new Vector2(lx, 330), lw);
             var cards = UIObj("CardOffers", t);
-            Place(cards, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-380, 60), new Vector2(800, 380));
-            HList(cards, 40, TextAnchor.MiddleCenter);
+            Place(cards, mid, mid, new Vector2(lx + lw / 2f, 130), new Vector2(lw, 360));
+            HList(cards, 34, TextAnchor.MiddleCenter);
             p.cardOffersContainer = cards.transform;
+            p.levelsText = Mono(t, "Levels", "", 22, Palette.Ash, TextAlignmentOptions.Center);
+            Place(p.levelsText, mid, mid, new Vector2(lx + lw / 2f, -122), new Vector2(lw, 30));
 
-            var items = UIObj("ItemOffers", t);
-            Place(items, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(170, 60), new Vector2(300, 260));
-            VList(items, 24, TextAnchor.MiddleCenter);
-            p.itemOffersContainer = items.transform;
-
+            Section(t, "ServicesTitle", "SERVICES", new Vector2(lx, -190), lw);
             var services = UIObj("Services", t);
-            Place(services, new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(-440, 70), new Vector2(700, 190));
-            VList(services, 4, TextAnchor.LowerLeft);
-            p.upgradeButton = MenuItem(services.transform, "Upgrade", "Faire évoluer une carte", 28, new Vector2(700, 48));
-            p.removeButton = MenuItem(services.transform, "Remove", "Brûler une carte", 28, new Vector2(700, 48));
-            p.transformButton = MenuItem(services.transform, "Transform", "Transformer une Crise", 28, new Vector2(700, 48));
+            Place(services, mid, new Vector2(0f, 1f), new Vector2(lx, -200), new Vector2(lw, 230));
+            VList(services, 2, TextAnchor.UpperLeft);
+            p.upgradeButton = MenuItem(services.transform, "Upgrade", "Faire évoluer une carte", 28, new Vector2(lw, 46));
+            p.transformButton = MenuItem(services.transform, "Transform", "Transformer une Crise", 28, new Vector2(lw, 46));
+            p.removeButton = MenuItem(services.transform, "Remove", "Brûler une carte", 28, new Vector2(lw, 46));
+            p.rerollButton = MenuItem(services.transform, "Reroll", "Relancer la boutique", 28, new Vector2(lw, 46));
+
+            // ---- Droite : pilules, reliques, ton pilulier
+            const float rx = 60f, rw = 820f;
+            Section(t, "PillsTitle", "PILULES", new Vector2(rx, 330), rw);
+            p.pillsInfoText = SectionInfo(t, "PillsInfo", new Vector2(rx, 330), rw);
+            var pills = UIObj("PillOffers", t);
+            Place(pills, mid, mid, new Vector2(rx + rw / 2f, 200), new Vector2(rw, 240));
+            HList(pills, 20, TextAnchor.MiddleLeft);
+            p.pillOffersContainer = pills.transform;
+
+            Section(t, "RelicsTitle", "RELIQUES", new Vector2(rx, 30), rw);
+            p.relicsInfoText = SectionInfo(t, "RelicsInfo", new Vector2(rx, 30), rw);
+            var relics = UIObj("RelicOffers", t);
+            Place(relics, mid, mid, new Vector2(rx + rw / 2f, -100), new Vector2(rw, 240));
+            HList(relics, 20, TextAnchor.MiddleLeft);
+            p.relicOffersContainer = relics.transform;
+
+            var pillboxLabel = Mono(t, "PillboxTitle", "ton pilulier", 20, Palette.Ash, TextAlignmentOptions.Left);
+            Place(pillboxLabel, mid, new Vector2(0f, 0.5f), new Vector2(rx, -280), new Vector2(170, 30));
+            var owned = UIObj("OwnedPills", t);
+            Place(owned, mid, new Vector2(0f, 0.5f), new Vector2(rx + 170, -280), new Vector2(330, 80));
+            HList(owned, 12, TextAnchor.MiddleLeft);
+            p.ownedPillsContainer = owned.transform;
 
             p.continueButton = MenuItem(t, "Continue", "Manche suivante  ›", 40, new Vector2(500, 64), TextAlignmentOptions.Right);
-            Place(p.continueButton, new Vector2(1, 0), new Vector2(1, 0), new Vector2(-80, 80), new Vector2(500, 64));
+            Place(p.continueButton, new Vector2(1, 0), new Vector2(1, 0), new Vector2(-40, 30), new Vector2(500, 64));
+            // Messages (achats, erreurs) : en bas, au centre, loin des titres
             p.feedbackText = Body(t, "Feedback", "", 24, Palette.Hope, TextAlignmentOptions.Center);
             p.feedbackText.fontStyle = FontStyles.Italic;
             p.feedbackText.enableAutoSizing = true;
             p.feedbackText.fontSizeMin = 14; p.feedbackText.fontSizeMax = 24;
-            Place(p.feedbackText, top, top, new Vector2(0, -178), new Vector2(1500, 52));
+            Place(p.feedbackText, bottom, bottom, new Vector2(-120, 26), new Vector2(1000, 40));
+
+            // ---- Reliquaire : choix de la relique à magnifier (par-dessus le reste)
+            var chooser = UIObj("RelicChooser", t);
+            Stretch(chooser);
+            var cs = Img(chooser.transform, "Shade", Palette.Void.WithAlpha(0.9f), null, true);
+            Stretch(cs.gameObject);
+            var ct = Title(chooser.transform, "Title", "Quelle relique magnifier ?", 48, Palette.Bone);
+            Place(ct, mid, mid, new Vector2(0, 190), new Vector2(1400, 64));
+            var cst = Body(chooser.transform, "Subtitle", "Le Reliquaire double l'effet de la relique choisie.", 24, Palette.Ash);
+            Place(cst, mid, mid, new Vector2(0, 140), new Vector2(1400, 32));
+            var cc = UIObj("Choices", chooser.transform);
+            Place(cc, mid, mid, new Vector2(0, -40), new Vector2(1600, 260));
+            HList(cc, 24, TextAnchor.MiddleCenter);
+            p.chooserRoot = chooser;
+            p.chooserContainer = cc.transform;
+            chooser.SetActive(false);
             return p;
         }
 

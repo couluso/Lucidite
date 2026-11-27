@@ -18,6 +18,9 @@ MonoBehaviour:
   rarity: 1
   theme: 9
   flavorText: "Une heure par semaine pour d\xE9m\xEAler les n\u0153uds."
+  icon: {fileID: 2800000, guid: f66c84a9b6c71a64893dd76f9ef17f5a, type: 3}
+  face: {fileID: 2800000, guid: 47014940bc9b6224da4e3c61de025d6a, type: 3}
+  faceUpgraded: {fileID: 0}
   cost: 2
   unplayable: 0
   damage: 0

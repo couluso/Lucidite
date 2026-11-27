@@ -10,10 +10,14 @@ namespace Lucidite
     public class ItemSlotUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
     {
         public Image icon;
+        [Tooltip("Image de l'objet : gélule (pilules) ou statuette filmée (reliques, rempli par la boutique).")]
+        public RawImage preview;
         public TMP_Text nameText;
         public TMP_Text descText;
         public TMP_Text footerText;
         public Button button;
+        [Tooltip("Survol : description dans le panneau de droite (inutile quand l'offre l'écrit déjà).")]
+        public bool showTooltip = true;
 
         public ItemData Data { get; private set; }
         public OwnedItem Owned { get; private set; }
@@ -38,6 +42,19 @@ namespace Lucidite
             if (descText) descText.text = Data.Describe();
             if (footerText) { footerText.text = footer; footerText.gameObject.SetActive(!string.IsNullOrEmpty(footer)); }
             if (icon) icon.color = Data.tint;
+            SetPreview(Data.kind == ItemKind.Consommable ? PillLooks.UI(Data) : null);
+        }
+
+        /// <summary>Gélule ou statuette filmée ; sans image, on garde la pastille colorée.</summary>
+        public void SetPreview(Texture tex)
+        {
+            if (!preview) return;
+            preview.texture = tex;
+            preview.color = Color.white;
+            var fit = preview.GetComponent<AspectRatioFitter>();
+            if (fit && tex) fit.aspectRatio = tex.width / (float)Mathf.Max(1, tex.height);
+            preview.gameObject.SetActive(tex);
+            if (icon) icon.gameObject.SetActive(!tex);
         }
 
         public void OnClick(Action<ItemSlotUI> cb)
@@ -52,7 +69,7 @@ namespace Lucidite
         public void OnPointerEnter(PointerEventData e)
         {
             _over = true;
-            if (Data && UIManager.Instance && UIManager.Instance.inspector)
+            if (showTooltip && Data && UIManager.Instance && UIManager.Instance.inspector)
                 UIManager.Instance.inspector.ShowText(Data.itemName, ItemData.KindLabel(Data.kind),
                     $"{Data.Describe()}\n\n<i><color=#{Palette.HexOf(Palette.Ash)}>{Data.flavorText}</color></i>");
         }

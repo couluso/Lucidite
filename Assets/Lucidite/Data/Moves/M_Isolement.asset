@@ -16,6 +16,8 @@ MonoBehaviour:
   arcana: II
   theme: 3
   flavorText: "Ton t\xE9l\xE9phone ne sonne plus. Tu ne l'allumes plus."
+  icon: {fileID: 2800000, guid: 4ed832d84f115114ba4a70a882048856, type: 3}
+  face: {fileID: 2800000, guid: 49de59de6a723f7428646d8580535dfd, type: 3}
   damage: 0
   hits: 1
   block: 14

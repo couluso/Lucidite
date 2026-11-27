@@ -11,7 +11,8 @@ namespace Lucidite
         Victory, Defeat, RoundStart,
         CandleOut, CandleLight, BloodDrop,
         UIClick, Buy, Error,
-        Hit, Blocked, Shield, Burn, Swoosh, EndTurn, Rumble, Select
+        Hit, Blocked, Shield, Burn, Swoosh, EndTurn, Rumble, Select,
+        Crumble, DebrisHit
     }
 
     /// <summary>
@@ -129,6 +130,8 @@ namespace Lucidite
             _clips[Sfx.EndTurn] = ProceduralAudio.Bell(new[] { 196f, 392f }, 0.9f, 0.3f, 0.25f);
             _clips[Sfx.Rumble] = ProceduralAudio.Rumble();
             _clips[Sfx.Select] = ProceduralAudio.Drop();
+            _clips[Sfx.Crumble] = ProceduralAudio.Crumble();
+            _clips[Sfx.DebrisHit] = ProceduralAudio.Knock();
             foreach (var o in overrides) if (o.clip) _clips[o.sfx] = o.clip;
         }
 
@@ -142,7 +145,9 @@ namespace Lucidite
             src.clip = clip;
             src.volume = volume * SfxVolume;
             src.pitch = (sfx == Sfx.Hover || sfx == Sfx.CardDraw || sfx == Sfx.CardPlace || sfx == Sfx.BloodDrop || sfx == Sfx.UIClick)
-                ? Random.Range(0.92f, 1.08f) : 1f;
+                ? Random.Range(0.92f, 1.08f)
+                : sfx == Sfx.DebrisHit ? Random.Range(0.75f, 1.35f)
+                : sfx == Sfx.Crumble ? Random.Range(0.85f, 1.1f) : 1f;
             src.Play();
         }
 

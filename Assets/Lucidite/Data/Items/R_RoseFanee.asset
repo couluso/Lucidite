@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 594c91d710cdb234fbf68a6cef67b53c, type: 3}
+  m_Name: R_RoseFanee
+  m_EditorClassIdentifier: Assembly-CSharp::Lucidite.ItemData
+  itemName: "Rose fan\xE9e"
+  kind: 0
+  effect: 18
+  value: 2
+  price: 100
+  flavorText: "Les p\xE9tales sont tomb\xE9s. Les \xE9pines, elles, sont rest\xE9es."
+  tint: {r: 0.36078432, g: 0.101960786, b: 0.1254902, a: 1}
+  model: {fileID: 137161541844754166, guid: 2304c7d356217fb419d657e715e146b6, type: 3}
+  enemyCanBuy: 1
+  rare: 0

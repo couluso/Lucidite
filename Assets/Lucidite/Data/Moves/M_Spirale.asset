@@ -16,6 +16,8 @@ MonoBehaviour:
   arcana: X
   theme: 1
   flavorText: "Chaque pens\xE9e en entra\xEEne une pire."
+  icon: {fileID: 2800000, guid: a8b789aece93bde4988569e67779570c, type: 3}
+  face: {fileID: 2800000, guid: 364a49bc77835704b8d21cc5511aecea, type: 3}
   damage: 4
   hits: 2
   block: 0

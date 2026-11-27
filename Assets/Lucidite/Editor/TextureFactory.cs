@@ -95,7 +95,7 @@ namespace Lucidite.EditorTools
 
         // ------------------------------------------------------------------ Sauvegarde
 
-        public static Texture2D Save(Canvas c, string path, bool point = true, bool repeat = true, bool sprite = false, bool alpha = false)
+        public static Texture2D Save(Canvas c, string path, bool point = true, bool repeat = true, bool sprite = false, bool alpha = false, bool mips = false)
         {
             var tex = new Texture2D(c.w, c.h, TextureFormat.RGBA32, false);
             tex.SetPixels(c.px);
@@ -109,7 +109,7 @@ namespace Lucidite.EditorTools
             if (sprite) imp.spriteImportMode = SpriteImportMode.Single;
             imp.filterMode = point ? FilterMode.Point : FilterMode.Bilinear;
             imp.wrapMode = repeat ? TextureWrapMode.Repeat : TextureWrapMode.Clamp;
-            imp.mipmapEnabled = false;
+            imp.mipmapEnabled = mips;   // mips : traits fins (cartes) qui scintilleraient de loin
             imp.alphaIsTransparency = alpha;
             imp.textureCompression = TextureImporterCompression.Uncompressed;
             imp.SaveAndReimport();

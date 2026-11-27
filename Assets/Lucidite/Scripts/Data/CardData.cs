@@ -17,6 +17,12 @@ namespace Lucidite
         public CardRarity rarity = CardRarity.Commune;
         public CardTheme theme = CardTheme.Depression;
         [TextArea(2, 4)] public string flavorText = "";
+        [Tooltip("Grande icône centrale (contour blanc, teinté par la couleur du type). Générée par l'outil de setup.")]
+        public Texture2D icon;
+        [Tooltip("Face complète (fond, contours, icône, bonus). Générée par l'outil de setup.")]
+        public Texture2D face;
+        [Tooltip("Face de la version + si ses icônes de bonus diffèrent (sinon vide).")]
+        public Texture2D faceUpgraded;
 
         [Header("Coût")]
         [Range(0, 5)] public int cost = 1;
@@ -64,6 +70,31 @@ namespace Lucidite
         [Tooltip("Transformation en boutique (surtout pour les Crises).")]
         public CardData transformsInto;
         public bool inShop = true;
+
+        public static string SuitLabel(CardSuit s)
+        {
+            switch (s)
+            {
+                case CardSuit.Coeur: return "Cœur";
+                case CardSuit.Souffle: return "Souffle";
+                case CardSuit.Regard: return "Regard";
+                case CardSuit.Main: return "Main";
+                default: return "";
+            }
+        }
+
+        /// <summary>Bonus de Résonance (3 cartes d'une même classe jouées dans un tour).</summary>
+        public static string ResonanceLabel(CardSuit s)
+        {
+            switch (s)
+            {
+                case CardSuit.Coeur: return "récupère 4 Lucidité (+2 par niveau)";
+                case CardSuit.Souffle: return "tour suivant, pioche 2 cartes de plus";
+                case CardSuit.Regard: return "applique 2 Vulnérable et 1 Faiblesse";
+                case CardSuit.Main: return "gagne 8 Bouclier (+2 par niveau)";
+                default: return "";
+            }
+        }
 
         public static string TypeLabel(CardType t)
         {

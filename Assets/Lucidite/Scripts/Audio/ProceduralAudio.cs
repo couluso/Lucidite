@@ -287,6 +287,49 @@ namespace Lucidite
             return ToClip("rumble", d);
         }
 
+        /// <summary>Plâtre qui craque puis s'effrite : craquements secs de plus en plus espacés sur un grondement sourd.</summary>
+        public static AudioClip Crumble()
+        {
+            float dur = 1.6f;
+            var d = Buf(dur);
+            // Grondement grave filtré
+            var low = Buf(dur);
+            for (int i = 0; i < low.Length; i++) { float t = i / (float)Rate; low[i] = Noise() * Env(t, 0.02f, 0.45f); }
+            LowPass(low, 180f);
+            LowPass(low, 180f);
+            // Craquements : petites salves de bruit aigu, denses au début puis clairsemées (morceaux qui tombent)
+            var crack = Buf(dur);
+            int n = 70;
+            for (int k = 0; k < n; k++)
+            {
+                float u = (float)s_rng.NextDouble();
+                float start = u * u * dur * 0.9f;
+                float len = 0.004f + (float)s_rng.NextDouble() * 0.02f;
+                float amp = (0.25f + (float)s_rng.NextDouble() * 0.75f) * (1f - start / dur);
+                int i0 = (int)(start * Rate), i1 = Mathf.Min(crack.Length, i0 + (int)(len * Rate));
+                for (int i = i0; i < i1; i++) crack[i] += Noise() * amp * (1f - (i - i0) / (float)(i1 - i0));
+            }
+            HighPass(crack, 900f);
+            LowPass(crack, 6000f);
+            for (int i = 0; i < d.Length; i++) d[i] = low[i] * 2.2f + crack[i] * 0.8f;
+            return ToClip("crumble", d);
+        }
+
+        /// <summary>Choc d'un gravat sur le bois ou le sol : clic sourd et bref.</summary>
+        public static AudioClip Knock()
+        {
+            var d = Buf(0.09f);
+            float ph = 0f;
+            for (int i = 0; i < d.Length; i++)
+            {
+                float t = i / (float)Rate;
+                ph += TwoPi * Mathf.Lerp(520f, 260f, t / 0.09f) / Rate;
+                d[i] = (Noise() * Env(t, 0.0005f, 0.006f) * 0.9f + Mathf.Sin(ph) * Env(t, 0.001f, 0.02f) * 0.6f);
+            }
+            LowPass(d, 2500f);
+            return ToClip("knock", d);
+        }
+
         public static AudioClip Puff()
         {
             var d = Buf(0.25f);
