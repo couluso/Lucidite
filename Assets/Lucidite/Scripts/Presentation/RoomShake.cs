@@ -26,6 +26,18 @@ namespace Lucidite
         public Vector3 ceilingCenter = new Vector3(0, 2.62f, 0.2f);
         public Vector2 ceilingHalfSize = new Vector2(1.9f, 1.9f);
         public int maxDebris = 140;
+        [Tooltip("Zone de jeu tenue à l'écart des gravats (repère de la pièce, x / z) : ta main, tes cartes posées, les siennes. " +
+                 "Les gravats n'y tombent pas, et ceux qui y rebondissent s'effritent.")]
+        public Rect debrisKeepClear = new Rect(-0.46f, -0.75f, 0.92f, 1.1f);
+        [Tooltip("Hauteur sous laquelle un gravat dans la zone de jeu est retiré (au-dessus : il tombe encore).")]
+        public float keepClearHeight = 0.95f;
+
+        bool InKeepClear(Vector3 world, float margin)
+        {
+            var p = transform.InverseTransformPoint(world);
+            var r = debrisKeepClear;
+            return p.x > r.xMin - margin && p.x < r.xMax + margin && p.z > r.yMin - margin && p.z < r.yMax + margin;
+        }
         [Tooltip("Poussière qui tombe du plafond à chaque secousse destructrice (quantité selon la force).")]
         public ParticleSystem ceilingDust;
         [Tooltip("Fissures cachées, révélées au fil des coups.")]
@@ -141,7 +153,14 @@ namespace Lucidite
                 g.name = "Debris";
                 g.layer = 2; // Ignore Raycast : ne bloque pas le survol des cartes
                 g.transform.SetParent(transform, true);
-                g.transform.position = transform.TransformPoint(ceilingCenter + new Vector3(Random.Range(-ceilingHalfSize.x, ceilingHalfSize.x), 0f, Random.Range(-ceilingHalfSize.y, ceilingHalfSize.y)));
+                // Jamais au-dessus de la zone de jeu (sinon ils tombent sur les cartes) : on retire un point ailleurs
+                Vector3 spawn = transform.TransformPoint(ceilingCenter);
+                for (int tries = 0; tries < 12; tries++)
+                {
+                    spawn = transform.TransformPoint(ceilingCenter + new Vector3(Random.Range(-ceilingHalfSize.x, ceilingHalfSize.x), 0f, Random.Range(-ceilingHalfSize.y, ceilingHalfSize.y)));
+                    if (!InKeepClear(spawn, 0.1f)) break;
+                }
+                g.transform.position = spawn;
                 g.transform.rotation = Random.rotation;
                 float s = Random.Range(0.018f, 0.075f);
                 g.transform.localScale = new Vector3(s, s * Random.Range(0.25f, 0.9f), s * Random.Range(0.5f, 1.4f));
@@ -152,9 +171,30 @@ namespace Lucidite
                 rb.linearDamping = 0.2f;
                 rb.angularVelocity = Random.insideUnitSphere * 8f;
                 rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
-                g.AddComponent<DebrisSound>();
+                g.AddComponent<DebrisSound>().owner = this;
                 _debris.Add(g);
             }
+        }
+
+        /// <summary>Un gravat a rebondi jusque dans la zone de jeu : il s'effrite en poussière.</summary>
+        System.Collections.IEnumerator Crumble(GameObject g)
+        {
+            if (!g) yield break;
+            var rb = g.GetComponent<Rigidbody>();
+            if (rb) rb.isKinematic = true;
+            foreach (var c in g.GetComponents<Collider>()) c.enabled = false;
+            var s0 = g.transform.localScale;
+            if (ceilingDust)
+            {
+                var ep = new ParticleSystem.EmitParams { position = g.transform.position, applyShapeToPosition = false };
+                for (int i = 0; i < 6; i++) { ep.velocity = Random.insideUnitSphere * 0.08f; ceilingDust.Emit(ep, 1); }
+            }
+            for (float t = 0f; t < 1f && g; t += Time.deltaTime / 0.35f)
+            {
+                g.transform.localScale = s0 * (1f - t);
+                yield return null;
+            }
+            if (g) { _debris.Remove(g); Destroy(g); }
         }
 
         /// <summary>Petit choc sonore quand un gravat heurte la table ou le sol (les premiers rebonds seulement).</summary>
@@ -162,6 +202,20 @@ namespace Lucidite
         {
             static float s_last;
             int _hits;
+            bool _crumbling;
+            public RoomShake owner;
+
+            void Update()
+            {
+                // Rebondi dans la zone de jeu (sur les cartes, devant la caméra) : on l'efface
+                if (_crumbling || !owner) return;
+                if (transform.position.y < owner.transform.TransformPoint(new Vector3(0f, owner.keepClearHeight, 0f)).y
+                    && owner.InKeepClear(transform.position, 0f))
+                {
+                    _crumbling = true;
+                    owner.StartCoroutine(owner.Crumble(gameObject));
+                }
+            }
 
             void OnCollisionEnter(Collision c)
             {

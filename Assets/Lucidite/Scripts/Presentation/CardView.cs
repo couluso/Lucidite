@@ -103,7 +103,12 @@ namespace Lucidite
         {
             if (Card == null) return;
             var gm0 = GameManager.Instance;
-            if (gm0 && gm0.Player != null) amount *= 1f + gm0.Player.RelicValue(ItemEffect.SangCartes) / 100f; // relique « Calice »
+            if (gm0 && gm0.Player != null)
+            {
+                int pct = gm0.Player.RelicValue(ItemEffect.SangCartes);
+                amount *= 1f + pct / 100f; // relique « Cœur percé »
+                if (pct > 0 && amount > 0f) gm0.RelicFx(gm0.Player, ItemEffect.SangCartes, $"sang +{pct} %");
+            }
             bool scarlet = Card.AddBlood(amount);
             ApplyBlood();
             if (!scarlet) return;

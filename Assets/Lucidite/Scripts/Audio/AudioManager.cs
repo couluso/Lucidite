@@ -12,7 +12,8 @@ namespace Lucidite
         CandleOut, CandleLight, BloodDrop,
         UIClick, Buy, Error,
         Hit, Blocked, Shield, Burn, Swoosh, EndTurn, Rumble, Select,
-        Crumble, DebrisHit
+        Crumble, DebrisHit,
+        Gulp, Relic
     }
 
     /// <summary>
@@ -132,6 +133,8 @@ namespace Lucidite
             _clips[Sfx.Select] = ProceduralAudio.Drop();
             _clips[Sfx.Crumble] = ProceduralAudio.Crumble();
             _clips[Sfx.DebrisHit] = ProceduralAudio.Knock();
+            _clips[Sfx.Gulp] = ProceduralAudio.Gulp();
+            _clips[Sfx.Relic] = ProceduralAudio.RelicChime();
             foreach (var o in overrides) if (o.clip) _clips[o.sfx] = o.clip;
         }
 

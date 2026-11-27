@@ -14,6 +14,28 @@ namespace Lucidite
         Transform _enemyAnchor;
         Canvas _canvas;
 
+        public static DamagePopups Instance { get; private set; }
+        void Awake() { Instance = this; }
+        void OnDestroy() { if (Instance == this) Instance = null; }
+
+        /// <summary>Texte flottant au-dessus d'un point de la scène (ex. une relique qui fait effet).</summary>
+        public void SpawnWorld(Vector3 world, string label, Color color, float scale)
+        {
+            if (!popupPrefab || !_canvas || !PSXScreen.Instance || !PSXScreen.Instance.worldCamera) return;
+            var vp = PSXScreen.Instance.worldCamera.WorldToViewportPoint(world);
+            if (vp.z <= 0f) return;
+            var size = ((RectTransform)_canvas.transform).rect.size;
+            var t = Instantiate(popupPrefab, transform);
+            t.gameObject.SetActive(true);
+            t.text = label;
+            t.color = color;
+            var rt = t.rectTransform;
+            rt.anchorMin = rt.anchorMax = Vector2.zero;
+            rt.anchoredPosition = new Vector2(vp.x * size.x, vp.y * size.y);
+            rt.localScale = Vector3.one * scale;
+            StartCoroutine(Animate(t));
+        }
+
         void Start()
         {
             _canvas = GetComponentInParent<Canvas>();

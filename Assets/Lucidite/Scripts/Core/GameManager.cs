@@ -315,6 +315,29 @@ namespace Lucidite
             if (lost <= 0) return;
             if (victim == Side.Opponent) _spilled += lost * BleedMultiplier(victim);
             else _enemySpilled += lost * BleedMultiplier(victim);
+            var attacker = victim == Side.Player ? Enemy : Player;
+            if (attacker != null && attacker.HasRelic(ItemEffect.SaignementAdverse))
+                RelicFx(attacker, ItemEffect.SaignementAdverse, $"saigne ×{1 + attacker.RelicPower(ItemEffect.SaignementAdverse)}");
+        }
+
+        /// <summary>Une relique vient de faire effet (statuette qui sursaute, s'illumine et affiche son effet).</summary>
+        public event Action<Side, ItemData, string> OnRelicTriggered;
+
+        /// <summary>
+        /// Signale que les reliques de cet effet (et de cette valeur si précisée) viennent d'agir pour ce combattant.
+        /// Les reliques voilées ne font rien ; le Reliquaire qui magnifie l'une d'elles réagit avec elle.
+        /// </summary>
+        public void RelicFx(Fighter f, ItemEffect effect, string label, int value = int.MinValue)
+        {
+            if (f == null) return;
+            foreach (var r in f.relics)
+            {
+                if (!r || r.effect != effect || (value != int.MinValue && r.value != value) || f.Power(r) <= 0) continue;
+                OnRelicTriggered?.Invoke(f.side, r, label);
+                if (f.IsBuffed(r))
+                    foreach (var q in f.relics)
+                        if (q && q.effect == ItemEffect.Reliquaire && f.Power(q) > 0) OnRelicTriggered?.Invoke(f.side, q, "×2");
+            }
         }
 
         public void NotifyDeckChanged() => OnDeckChanged?.Invoke();
@@ -353,6 +376,9 @@ namespace Lucidite
             else foreach (var c in database.playerStarterDeck) if (c) Player.deck.Add(new CardInstance(c, RandomSuit()));
             _brain = new EnemyBrain(database.enemyMoves);
             _brain.progress.blood = config.enemyStartingBlood;
+            // Elle commence avec une pilule dans son pilulier (on la verra l'avaler dès la première manche)
+            var herPills = database.items.FindAll(i => i && i.enemyCanBuy && !i.rare && i.kind != ItemKind.Relique && !i.IsPassive);
+            if (herPills.Count > 0) Enemy.items.Add(new OwnedItem(herPills[UnityEngine.Random.Range(0, herPills.Count)]));
 
             Stats = new MatchStats();
             Blood = 0;
@@ -370,15 +396,23 @@ namespace Lucidite
                 if (CheckMatchEnd()) yield break;
 
                 // Elle aussi passe par la "boutique" avec ses gouttes de sang ; ses reliques et pilules se posent de son côté
-                var bought = _brain.Shop(config, Round, Enemy, database.items, (item) => OnItemBought?.Invoke(Side.Opponent, item));
+                var bought = _brain.Shop(config, Round, Enemy, Player, database.items, !_lastRoundWon, (item) => OnItemBought?.Invoke(Side.Opponent, item));
 #if UNITY_EDITOR
-                if (bought.Count > 0) Debug.Log($"[Lucidité] Boutique de la Dépression (manche {Round}, reste {_brain.progress.blood} gouttes) : {string.Join(" | ", bought)}");
+                {
+                    var log = _brain.progress.log;
+                    string saving = log.Count > 0 && log[log.Count - 1].StartsWith("(") ? "  " + log[log.Count - 1] : "";
+                    Debug.Log($"[Lucidité] Boutique de la Dépression (manche {Round}, reste {_brain.progress.blood} gouttes) : " +
+                              (bought.Count > 0 ? string.Join(" | ", bought) : "rien") + saving);
+                }
 #endif
 
                 SetPhase(GamePhase.Shop);
                 Shop.GenerateOffers();
                 _shopDone = false;
                 OnShopOpened?.Invoke();
+                int sv;
+                if ((sv = Player.RelicValue(ItemEffect.RemiseBoutique)) > 0) RelicFx(Player, ItemEffect.RemiseBoutique, $"-{sv} %");
+                if ((sv = Player.RelicValue(ItemEffect.RelanceGratuite)) > 0) RelicFx(Player, ItemEffect.RelanceGratuite, sv > 1 ? $"{sv} relances offertes" : "relance offerte");
                 yield return new WaitUntil(() => _shopDone);
                 OnShopClosed?.Invoke();
             }
@@ -411,8 +445,17 @@ namespace Lucidite
             OnRoundStarted?.Invoke(Round);
             NotifyStats();
             if (board) yield return board.RoundStartRoutine(Round);
-            if (veilOnEnemy) Message($"Ton voile noir recouvre « {veilOnEnemy.itemName} » : sans effet cette manche.");
-            if (veilOnPlayer) Message($"Son voile noir recouvre ta relique « {veilOnPlayer.itemName} » : sans effet cette manche.");
+            if (veilOnEnemy) { Message($"Ton voile noir recouvre « {veilOnEnemy.itemName} » : sans effet cette manche."); RelicFx(Player, ItemEffect.VoileAdverse, $"voile « {veilOnEnemy.itemName} »"); }
+            if (veilOnPlayer) { Message($"Son voile noir recouvre ta relique « {veilOnPlayer.itemName} » : sans effet cette manche."); RelicFx(Enemy, ItemEffect.VoileAdverse, $"voile « {veilOnPlayer.itemName} »"); }
+            // Reliques de début de manche : chacune sursaute en appliquant son bonus
+            foreach (var f in new[] { Player, Enemy })
+            {
+                string life = f == Player ? "Lucidité" : "Emprise";
+                int v;
+                if ((v = f.RelicValue(ItemEffect.LuciditeMax)) > 0) RelicFx(f, ItemEffect.LuciditeMax, $"+{v} {life} max");
+                if ((v = f.RelicValue(ItemEffect.ForceDebutManche)) > 0) RelicFx(f, ItemEffect.ForceDebutManche, $"+{v} Force");
+                if ((v = f.RelicValue(ItemEffect.BouclierDebutManche)) > 0) RelicFx(f, ItemEffect.BouclierDebutManche, $"+{v} Bouclier");
+            }
 
             while (!Player.IsDead && !Enemy.IsDead)
             {
@@ -445,7 +488,9 @@ namespace Lucidite
             int spilledBlood = Mathf.FloorToInt(_spilled * config.bloodPerDamage);
             if (spilledBlood > 0) { blood += spilledBlood; summary.lines.Add($"Saignement de la Dépression ({Mathf.RoundToInt(_spilled)}) : +{spilledBlood}"); }
             int relicBlood = Player.RelicValue(ItemEffect.GouttesBonus);
-            if (relicBlood > 0) { blood += relicBlood; summary.lines.Add($"Reliques : +{relicBlood}"); }
+            if (relicBlood > 0) { blood += relicBlood; summary.lines.Add($"Reliques : +{relicBlood}"); RelicFx(Player, ItemEffect.GouttesBonus, $"+{relicBlood} gouttes"); }
+            int herRelicBlood = Enemy.RelicValue(ItemEffect.GouttesBonus);
+            if (herRelicBlood > 0) RelicFx(Enemy, ItemEffect.GouttesBonus, $"+{herRelicBlood} gouttes");
             summary.bloodTotal = blood;
 
             // Ses gouttes à elle : même barème que la joueuse (manche gagnée / perdue + sang qu'elle a fait couler)
@@ -487,15 +532,28 @@ namespace Lucidite
             Player.hitThisTurn = Enemy.hitThisTurn = false;
             OnTurnStarted?.Invoke(Turn);
             int regen = Player.RelicValue(ItemEffect.SoinDebutTour);
-            if (regen > 0) { int h = Player.Heal(regen); if (h > 0) OnHealed?.Invoke(Side.Player, h); }
+            if (regen > 0) { int h = Player.Heal(regen); if (h > 0) { OnHealed?.Invoke(Side.Player, h); RelicFx(Player, ItemEffect.SoinDebutTour, $"+{h} Lucidité"); } }
+            // Reliques d'énergie et de pioche (les tiennes) et d'énergie (les siennes : elle a pu poser plus de cartes)
+            int rv;
+            if ((rv = Player.RelicValue(ItemEffect.EnergieMax)) > 0) RelicFx(Player, ItemEffect.EnergieMax, $"+{rv} énergie");
+            if (Turn == 1 && (rv = Player.RelicValue(ItemEffect.EnergiePremierTour)) > 0) RelicFx(Player, ItemEffect.EnergiePremierTour, $"+{rv} énergie");
+            if (Turn == 1 && (rv = Player.RelicValue(ItemEffect.PiocheDebutManche)) > 0) RelicFx(Player, ItemEffect.PiocheDebutManche, $"+{rv} cartes");
+            if ((rv = Enemy.RelicValue(ItemEffect.EnergieMax)) > 0) RelicFx(Enemy, ItemEffect.EnergieMax, $"+{rv} énergie");
             // Elle avale parfois une de ses pilules (posées de son côté de la table)
-            var pill = _brain.ChoosePill(Enemy, Player, _intents);
+            var pill = _brain.ChoosePill(Enemy, Player, _intents, Turn);
             if (pill != null)
             {
-                Enemy.items.Remove(pill);
+                _busy++; // pas d'action pendant qu'elle avale
                 yield return new WaitForSeconds(0.4f);
+                var swallow = TableItems.Instance ? TableItems.Instance.BeginSwallow(Side.Opponent, pill) : null;
+                Enemy.items.Remove(pill);
                 Message($"La Dépression avale une pilule : {pill.data.itemName}.");
+#if UNITY_EDITOR
+                Debug.Log($"[Lucidité] La Dépression avale : {pill.data.itemName} (manche {Round}, tour {Turn}, il lui en reste {Enemy.items.Count}).");
+#endif
+                if (swallow != null) yield return swallow;
                 yield return ApplyItemRoutine(Side.Opponent, pill.data);
+                _busy--;
             }
 
             // Pioche normale jusqu'à la limite de main, puis pioches bonus (cartes « Pioche », relique) au-delà
@@ -575,7 +633,7 @@ namespace Lucidite
             SetPhase(GamePhase.EnemyTurn);
             Enemy.block = 0;
             int regen = Enemy.RelicValue(ItemEffect.SoinDebutTour);
-            if (regen > 0) { int h = Enemy.Heal(regen); if (h > 0) OnHealed?.Invoke(Side.Opponent, h); }
+            if (regen > 0) { int h = Enemy.Heal(regen); if (h > 0) { OnHealed?.Invoke(Side.Opponent, h); RelicFx(Enemy, ItemEffect.SoinDebutTour, $"+{h} Emprise"); } }
             NotifyStats();
             yield return new WaitForSeconds(config.enemyActDelay);
 
@@ -632,8 +690,16 @@ namespace Lucidite
             {
                 victim.hitThisTurn = true;
                 int red = victim.RelicValue(ItemEffect.PremierCoupReduit);
-                if (red > 0 && dmg > 0) dmg = Mathf.Max(0, dmg - red);
+                if (red > 0 && dmg > 0)
+                {
+                    int before = dmg;
+                    dmg = Mathf.Max(0, dmg - red);
+                    RelicFx(victim, ItemEffect.PremierCoupReduit, $"-{before - dmg} dégâts");
+                }
             }
+            // Vanité : bonus de dégâts déjà compté dans dmg (CombatRules) quand l'attaquant vacille
+            if (dmg > 0 && attacker.IsLowLucidity && attacker.RelicValue(ItemEffect.DegatsSiLuciditeBasse) > 0)
+                RelicFx(attacker, ItemEffect.DegatsSiLuciditeBasse, $"+{attacker.RelicValue(ItemEffect.DegatsSiLuciditeBasse)} dégâts");
             int lost = victim.TakeDamage(dmg, out blocked);
             if (victim == Player) Stats.damageTaken += lost; else Stats.damageDealt += lost;
             Spill(victim.side, lost);
@@ -644,7 +710,7 @@ namespace Lucidite
                 int back = attacker.LoseHp(thorns);
                 if (attacker == Player) Stats.damageTaken += back; else Stats.damageDealt += back;
                 Spill(attacker.side, back);
-                if (back > 0) OnDamaged?.Invoke(attacker.side, back, 0);
+                if (back > 0) { OnDamaged?.Invoke(attacker.side, back, 0); RelicFx(victim, ItemEffect.Epines, $"épines -{back}"); }
             }
             NotifyStats();
             return lost;
@@ -681,6 +747,7 @@ namespace Lucidite
             Message($"Résonance — {CardData.SuitLabel(s)} : {CardData.ResonanceLabel(s)}.");
             AudioManager.Play(Sfx.Heartbeat, 0.9f);
             OnResonance?.Invoke(s);
+            if (Player.HasRelic(ItemEffect.ResonanceFacile, (int)s)) RelicFx(Player, ItemEffect.ResonanceFacile, $"Résonance à {ResonanceNeed(s)}", (int)s);
             switch (s)
             {
                 case CardSuit.Coeur: { int h = Player.Heal(4 + lv); if (h > 0) OnHealed?.Invoke(Side.Player, h); break; }
@@ -712,6 +779,8 @@ namespace Lucidite
             int classDmg = c.suit != CardSuit.Aucune ? ItemData.ClassDamage * Player.RelicPower(ItemEffect.DegatsClasse, (int)c.suit) : 0;
             int baseDmg = sp == CardSpecial.DegatsSelonBouclier ? Player.block : (c.Damage > 0 ? (c.Damage + bonus + classDmg) * mult : 0);
             int hits = c.Hits + (sp == CardSpecial.CoupsParClasse ? sameSuitBefore : 0);
+            if (classDmg > 0 && baseDmg > 0 && sp != CardSpecial.DegatsSelonBouclier)
+                RelicFx(Player, ItemEffect.DegatsClasse, $"+{classDmg} dégâts", (int)c.suit);
             if (baseDmg > 0 || sp == CardSpecial.DegatsSelonBouclier)
             {
                 for (int h = 0; h < hits && !Enemy.IsDead; h++)
@@ -819,9 +888,12 @@ namespace Lucidite
         IEnumerator UseItemRoutine(OwnedItem item)
         {
             _busy++;
+            // L'animation prend la pilule en charge avant qu'elle quitte le pilulier
+            var swallow = TableItems.Instance && Phase != GamePhase.Shop ? TableItems.Instance.BeginSwallow(Side.Player, item) : null;
             Player.items.Remove(item);
             NotifyItemsChanged();
             Message($"{item.data.itemName}.");
+            if (swallow != null) yield return swallow;
             yield return ApplyItemRoutine(Side.Player, item.data);
             _busy--;
         }

@@ -39,6 +39,28 @@ namespace Lucidite
         public float headRestHeight = 0.09f;
         public float maxCollapseAngle = 72f;
 
+        [Header("Pilule")]
+        [Tooltip("0 → 1 : elle relève le menton pour avaler.")]
+        [Range(0f, 1f)] public float gulp;
+        [Tooltip("Position de la bouche par rapport à l'os de la tête (repère du corps : x côté, y haut, z vers la joueuse).")]
+        public Vector3 mouthOffset = new Vector3(0f, 0.035f, 0.075f);
+
+        /// <summary>Position (monde) de sa bouche.</summary>
+        public Vector3 MouthPosition
+        {
+            get
+            {
+                var basis = body ? body : transform;
+                var h = head ? head.position : basis.position + basis.up * 1.2f;
+                return h + basis.right * mouthOffset.x + basis.up * mouthOffset.y + basis.forward * mouthOffset.z;
+            }
+        }
+
+        public OpponentArmsIK ArmsIK => _ik ? _ik : (_ik = GetComponent<OpponentArmsIK>());
+
+        /// <summary>Frisson bref (ex. après avoir avalé une pilule).</summary>
+        public void Shudder(float amount) => _flinch = Mathf.Max(_flinch, Mathf.Clamp01(amount));
+
         bool _dead;
         float _deadT;   // 0 -> 1 : abandon de la posture (regard, respiration, yeux)
         float _fall;    // bascule en avant (degrés)
@@ -296,6 +318,7 @@ namespace Lucidite
             if (side.sqrMagnitude < 1e-6f) return;
             side.Normalize();
             float nod = (_slump * 14f - _lean * 6f + _flinch * 12f) * Mathf.Lerp(1f, 0.5f, headMotion); // >0 : baisse le menton
+            nod -= gulp * 22f; // elle avale : le menton se relève
             float tilt = Mathf.Sin(t * 0.13f) * headTilt * 0.6f + (Mathf.PerlinNoise(t * 0.4f, 3f) - 0.5f) * 5f;
             float twitch = _flinch > 0f ? Mathf.Sin(t * 60f) * _flinch * 5f : 0f;
             head.rotation = Quaternion.AngleAxis(tilt * (1f - _deadT), face) * Quaternion.AngleAxis(twitch, Vector3.up) * Quaternion.AngleAxis(-nod * (1f - _deadT), side) * head.rotation;

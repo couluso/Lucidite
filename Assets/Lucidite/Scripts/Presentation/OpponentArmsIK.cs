@@ -52,6 +52,31 @@ namespace Lucidite
         [Tooltip("Où tombent ses mains sur la table (repère de cet objet) : écart latéral, avancée depuis le bord.")]
         public Vector2 collapsedHands = new Vector2(0.24f, 0.17f);
 
+        [Header("Geste (ex. porter une pilule à sa bouche)")]
+        [Tooltip("0 = la main tient l'éventail, 1 = elle suit la cible du geste.")]
+        [Range(0f, 1f)] public float gesture;
+        Arm _gestureArm;
+        Vector3 _gestureTarget, _gestureHandDir = Vector3.up;
+
+        /// <summary>
+        /// Une main quitte l'éventail pour aller vers un point (monde) : le bout de la main s'y pose, orientée selon handDir.
+        /// Le bras choisi est celui dont l'épaule est la plus proche de <paramref name="near"/>.
+        /// </summary>
+        public void BeginGesture(Vector3 near)
+        {
+            if (!left.upper || !right.upper) { _gestureArm = left.upper ? left : right; return; }
+            _gestureArm = (left.upper.position - near).sqrMagnitude <= (right.upper.position - near).sqrMagnitude ? left : right;
+        }
+
+        public void SetGestureTarget(Vector3 tipWorld, Vector3 handDir)
+        {
+            _gestureTarget = tipWorld;
+            if (handDir.sqrMagnitude > 1e-6f) _gestureHandDir = handDir.normalized;
+        }
+
+        /// <summary>Bout de la main qui fait le geste (pour y accrocher la pilule).</summary>
+        public Transform GestureTip => _gestureArm == null ? null : (_gestureArm.handTip ? _gestureArm.handTip : _gestureArm.hand);
+
         Vector3 _fanBase;
         bool _fanInit;
 
@@ -160,7 +185,15 @@ namespace Lucidite
                                 : (up * 0.8f + inDir * handTiltIn + toPlayer * 0.35f).normalized;
 
             // Le bout de la main s'arrête sur le coin : le poignet est en dessous, côté extérieur
-            var wristTarget = body.TransformPoint(a.grip) - handDir * a.handLen * 0.8f;
+            var tipTarget = body.TransformPoint(a.grip);
+            // Geste : cette main quitte l'éventail pour la cible (pilule, bouche)
+            if (!lying && gesture > 0f && a == _gestureArm)
+            {
+                float g = Mathf.SmoothStep(0f, 1f, gesture);
+                tipTarget = Vector3.Lerp(tipTarget, _gestureTarget, g);
+                handDir = Vector3.Slerp(handDir, _gestureHandDir, g).normalized;
+            }
+            var wristTarget = tipTarget - handDir * a.handLen * 0.8f;
 
             // IK deux os
             var S = a.upper.position;

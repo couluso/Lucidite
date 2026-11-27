@@ -58,6 +58,26 @@ namespace Lucidite
         /// Choc brutal : la caméra est projetée (comme si la pièce avait été frappée) puis revient en oscillant.
         /// amount ~ 0..1.
         /// </summary>
+        // Coup d'œil : le regard se tourne un peu vers un point de la scène (ex. elle avale une pilule)
+        Vector3 _glanceTarget;
+        float _glanceUntil, _glance;
+        [Header("Coup d'œil")]
+        [Range(0f, 1f)] public float glanceStrength = 0.45f;
+
+        /// <summary>Pendant <paramref name="duration"/> secondes, le regard glisse vers ce point puis revient.</summary>
+        public void Glance(Vector3 world, float duration)
+        {
+            _glanceTarget = world;
+            _glanceUntil = Time.unscaledTime + duration;
+        }
+
+        /// <summary>Déglutition : la tête plonge légèrement puis revient (ressort du coup violent, vers le bas).</summary>
+        public void Nod(float amount)
+        {
+            _joltRotVel += new Vector3(70f * amount, 0f, 0f);
+            _joltPosVel += new Vector3(0f, -0.06f * amount, 0f);
+        }
+
         public void Jolt(float amount)
         {
             amount *= ShakeMultiplier;
@@ -95,6 +115,14 @@ namespace Lucidite
                 float nx = Mathf.Clamp(m.x / Mathf.Max(1, Screen.width) * 2f - 1f, -1f, 1f);
                 float ny = Mathf.Clamp(m.y / Mathf.Max(1, Screen.height) * 2f - 1f, -1f, 1f);
                 targetRot *= Quaternion.Euler(-ny * mouseLookPitch, nx * mouseLookYaw, 0f);
+            }
+
+            // Coup d'œil vers un point (montée et retour en douceur)
+            _glance = Mathf.MoveTowards(_glance, Time.unscaledTime < _glanceUntil ? 1f : 0f, Time.unscaledDeltaTime * 2.2f);
+            if (_glance > 0f && seated)
+            {
+                var look = Quaternion.LookRotation(_glanceTarget - transform.position, Vector3.up);
+                targetRot = Quaternion.Slerp(targetRot, look, glanceStrength * Mathf.SmoothStep(0f, 1f, _glance));
             }
 
             transform.position = Vector3.Lerp(transform.position, target.position, k);

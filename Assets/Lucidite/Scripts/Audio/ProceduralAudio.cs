@@ -111,6 +111,46 @@ namespace Lucidite
             return ToClip("thump", d);
         }
 
+        /// <summary>Déglutition : petit clic de langue puis « glouc » grave qui descend.</summary>
+        public static AudioClip Gulp()
+        {
+            const float dur = 0.42f;
+            var d = Buf(dur);
+            float ph = 0f;
+            for (int i = 0; i < d.Length; i++)
+            {
+                float t = i / (float)Rate;
+                // clic humide au début
+                float click = Noise() * Env(t, 0.001f, 0.008f) * 0.35f;
+                // glouc : bosse de pression, fréquence qui chute (la pilule descend)
+                float g = t > 0.07f ? t - 0.07f : 0f;
+                float f = Mathf.Lerp(320f, 95f, Mathf.Clamp01(g / 0.22f));
+                ph += TwoPi * f / Rate;
+                float body = t > 0.07f ? Mathf.Sin(ph) * Env(g, 0.02f, 0.09f) * 0.8f : 0f;
+                // second petit glouc plus bas
+                float g2 = t > 0.24f ? t - 0.24f : 0f;
+                float body2 = t > 0.24f ? Mathf.Sin(TwoPi * Mathf.Lerp(180f, 80f, Mathf.Clamp01(g2 / 0.15f)) * g2) * Env(g2, 0.015f, 0.07f) * 0.45f : 0f;
+                d[i] = click + body + body2;
+            }
+            LowPass(d, 1400f);
+            return ToClip("gulp", d);
+        }
+
+        /// <summary>Relique qui fait effet : carillon sourd et bref, avec un souffle de poussière.</summary>
+        public static AudioClip RelicChime()
+        {
+            const float dur = 0.9f;
+            var d = Buf(dur);
+            float[] f = { 587.3f, 880f * 1.004f, 1174.7f * 0.997f, 1760f };
+            for (int i = 0; i < d.Length; i++)
+            {
+                float t = i / (float)Rate, s = 0f;
+                for (int k = 0; k < f.Length; k++) s += Mathf.Sin(TwoPi * f[k] * t) * Env(t, 0.002f, 0.32f / (1f + k * 0.6f)) / (1f + k);
+                d[i] = s * 0.45f + Noise() * Env(t, 0.004f, 0.05f) * 0.12f;
+            }
+            return ToClip("relic", d);
+        }
+
         public static AudioClip Flip()
         {
             var d = Buf(0.12f);

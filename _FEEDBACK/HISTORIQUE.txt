@@ -405,6 +405,101 @@ Editor/            LuciditeSetup, PrefabFactory, DataFactory, UIFactory,
       plupart des nouvelles reliques. Pas les objets liés à une classe
       (cloches, ex-votos, conversions, niveaux), qui n'ont pas de sens pour
       elle.
+29) (1er PC, après pull) Ses reliques, son IA de boutique, pilules avalées,
+    juice des reliques, gravats.
+    - Son pilulier est TOUJOURS visible de son côté (avant : caché tant
+      qu'il était vide). Ses nouvelles statuettes n'apparaissent plus pendant
+      la boutique (cachées par l'écran) mais au début de la manche suivante :
+      elles tombent sur la table avec le juice et « Elle a acquis : X ».
+    - IA de sa boutique refaite (EnemyBrain.Shop). Avant : achat au hasard
+      parmi tout ce qui était abordable, une seule relique et une seule
+      pilule tirées au hasard, une chance sur deux d'arrêter d'acheter pour
+      « économiser » l'énergie, carte affûtée au hasard -> elle n'achetait
+      presque jamais de relique. Maintenant :
+      · elle voit des offres comme toi (relicOffers + 1 reliques,
+        pillOffers pilules, tirées au hasard) + ses renforcements ;
+      · chaque option a une VALEUR estimée selon la situation (ses dégâts
+        moyens par carte, coups par tour, énergie de la manche suivante, tes
+        reliques pour Voile / Kleptomanie, manches restantes) ; les effets
+        durables (renforcements, reliques) sont multipliés par les manches
+        restantes, les pilules comptent pour un usage ;
+      · elle achète au meilleur rapport valeur / prix (aléa ±15 %) ;
+        rendements décroissants sur les renforcements répétés ; pas deux fois
+        la même pilule en réserve ; défense privilégiée après une manche
+        perdue, attaque après une manche gagnée ;
+      · elle affûte sa carte la plus rentable, débloque la plus forte des
+        obsessions, et le Reliquaire magnifie sa relique la plus utile ;
+      · elle n'économise que si un achat nettement meilleur (×1.35) sera
+        payable à la manche suivante.
+      Journal dans la console de l'éditeur (« Boutique de la Dépression »).
+      Elle est sans doute un peu plus forte : levier enemyBloodScale.
+    - Pilules AVALÉES À L'ÉCRAN (TableItems.BeginSwallow) :
+      · toi : la gélule se soulève, file vers ta bouche (bas de l'écran),
+        « glouc » (Sfx.Gulp), la tête plonge (CameraRig.Nod), voile bref de
+        la couleur de la gélule ;
+      · elle : la gélule saute de son pilulier, une de ses mains quitte
+        l'éventail pour la cueillir (OpponentArmsIK.BeginGesture / gesture),
+        la porte à ses lèvres (OpponentView.MouthPosition), elle relève le
+        menton (OpponentView.gulp) et avale, puis la main revient aux cartes.
+        Tu ne peux pas jouer pendant ce temps.
+      · En boutique, pas d'animation (l'écran couvre la table).
+    - JUICE DES RELIQUES : à CHAQUE fois qu'une relique fait effet (les
+      tiennes et les siennes), la statuette sursaute (rebond, saut,
+      rotation), s'illumine (lumière dorée + teinte), soulève de la
+      poussière, tinte (Sfx.Relic) et affiche son effet au-dessus d'elle
+      (« +8 Bouclier », « épines -2 », « -4 dégâts »...). Le Reliquaire
+      réagit avec la relique qu'il double (« ×2 »). Déclencheurs
+      (GameManager.RelicFx -> OnRelicTriggered -> TableItems) : début de
+      manche (Lucidité/Emprise max, Force, Bouclier, Voile), début de tour
+      (Veilleuse, Métronome, Danseuse, Penseur), coups (Bras croisés, Rose
+      fanée, Vanité, ex-votos, Pleureuse), Résonance des cloches, sang sur
+      les cartes (Cœur percé), fin de manche (Lacrymatoire), boutique
+      (Corbeau, Sablier : derrière l'écran de la boutique). Anti-spam : une
+      même relique ne ressaute pas avant 0.6 s ; plusieurs reliques en même
+      temps se suivent à 0.2 s.
+    - Gravats : ils ne tombent plus au-dessus de la zone de jeu (ta main,
+      tes cartes posées, les siennes : RoomShake.debrisKeepClear, repère de
+      la pièce x -0.46..0.46, z -0.75..0.35). Ceux qui y rebondissent
+      s'effritent en poussière. Les bords de la table et le sol en reçoivent
+      toujours.
+30) Retour sur le point 29 : « elle a acheté une relique mais rien ne
+    s'affiche ». En fait la console montrait 2 × « Insomnie chronique »
+    (+8 Emprise max) : un renforcement INVISIBLE, pas une relique.
+    - Cause : classement au rapport valeur / prix -> les renforcements à 50
+      gagnaient toujours contre une relique à 80-150 avec ~100 gouttes.
+      Maintenant elle choisit le meilleur PANIER pour tout son budget
+      (jusqu'à 3 achats, renforcements répétables à ×0.85 ;
+      EnemyBrain.BestBasket) et économise si le panier possible avec les
+      gouttes de la manche suivante vaut ×1.4. Les reliques valent ×1.5
+      (visibles, durables) ; après une manche perdue l'Emprise compte ×1.15
+      (au lieu de ×1.25). La console indique aussi « rien » et pour quoi
+      elle économise.
+    - SES RELIQUES DÉLABRÉES ET SANGLANTES (TableItemView.Defile) : couleurs
+      ternies et brunies, statuette penchée de travers, taches et coulées de
+      sang (texture générée, carte de blessures du shader PSX), de plus en
+      plus couvertes à chaque manche (+10 %). Elles pleurent du sang en
+      continu : les gouttes tombent sur la table et y laissent des flaques ;
+      une flaque s'étale à leur pied quand elles sont posées. Leur juice est
+      rouge : lumière rouge, éclaboussures de sang, coulée fraîche, texte
+      rouge.
+31) « Elle n'utilise pas ses consommables, ou ça ne se voit pas ».
+    L'animation existait (point 29) mais ne se déclenchait presque jamais :
+    - elle n'achetait quasi pas de pilules (une pilule = un usage, face à
+      des reliques comptées sur toutes les manches restantes ; panier de 3) ;
+    - elle décidait de les avaler sur des tirages à 35-55 %.
+    Correctifs :
+    - Elle COMMENCE la partie avec une pilule au hasard dans son pilulier.
+    - Boutique : la première pilule vaut ×2.2 pour elle, la deuxième ×1.3 ;
+      panier jusqu'à 4 achats ; si elle n'en a aucune et qu'il lui reste de
+      quoi, elle achète la plus utile de ses offres.
+    - Décision (EnemyBrain.ChoosePill) : envie de 0 à 1 pour chaque pilule
+      selon la situation (Lucidité manquante, dégâts prévus, ta main, tes
+      reliques...), elle avale la plus utile si l'envie dépasse un seuil qui
+      baisse avec le nombre de pilules en réserve et les tours de la manche.
+    - Plus visible : ta caméra jette un coup d'œil vers elle pendant qu'elle
+      avale (CameraRig.Glance, glanceStrength 0.45), geste plus lent, frisson
+      après la déglutition (OpponentView.Shudder), voile bref de la couleur
+      de la gélule. Console : « [Lucidité] La Dépression avale : X ».
 
 
 ---------------------------------------------------------------------
@@ -417,6 +512,19 @@ relancer « Lucidité > Construire le jeu » (indispensable : textures, prefab e
 données sont regénérés) puis jouer.
 
 À contrôler :
+- Point 31 : elle avale au moins une pilule pendant la 1re manche (console) ;
+  sa main atteint sa bouche (sinon OpponentView.mouthOffset) ; coup d'œil
+  de la caméra pas trop brusque (CameraRig.glanceStrength).
+- Point 30 : ses achats de reliques (console) ; allure de ses statuettes
+  (sang lisible ? sinon _BaseMap_ST / BloodTex dans TableItemView) ; quantité
+  de sang qui goutte (WeepRate) et flaques à leur pied.
+- Point 29 (rien n'est encore testé en jeu) : son pilulier visible ; ses
+  statuettes qui tombent au début de la manche suivante ; ses achats
+  (console : « Boutique de la Dépression ») et la difficulté qui en
+  résulte ; sa main qui va chercher la pilule et la porte bien à sa bouche
+  (sinon : OpponentView.mouthOffset) ; ta pilule qui monte vers la caméra
+  et la tête qui plonge ; juice des reliques (lisible, pas trop envahissant) ;
+  plus de gravats sur les cartes.
 - Point 28 (rien n'est encore testé en jeu) : allure des nouvelles statuettes
   (verre des cloches lisible ?) ; elles ne se survolent plus par accident ;
   le couvercle du pilulier s'ouvre vers le haut ; pilules alignées à côté de
@@ -502,6 +610,14 @@ Classes, boutique et sang (GameConfig, réécrit par DataFactory.BuildConfig) :
   (1 chance sur 4 d'apparaître). Bonus des ex-votos : ItemData.ClassDamage (3).
   Rendu 3D de la boutique : RelicStage (frameHeight 0.105, turnSpeed 35).
 
+Pilules avalées : OpponentView.mouthOffset (bouche / os de la tête, repère du
+  corps : 0, 0.035, 0.075) ; OpponentArmsIK.gesture (piloté par TableItems) ;
+  durées dans TableItems.SwallowPlayer / SwallowEnemy. CameraRig.Nod(force).
+Juice des reliques : TableItems.juiceCooldown (0.6), juiceStagger (0.2) ;
+  courbe et lumière dans TableItemView.JuiceCurve / StartJuiceFx.
+IA de sa boutique : EnemyBrain.ItemValue (valeur de chaque relique / pilule),
+  Shop (renforcements, seuil d'économie ×1.35, aléa ±15 %).
+Gravats : RoomShake.debrisKeepClear (zone sans gravats), keepClearHeight.
 Lumière : HangingLamp (cordon 1.32 m, spotIntensity 4, fillIntensity 0.5,
   idleSway 1, damping 0.38, impulseScale 1.6), Candle
 (lightIntensity 0.06), exposition dans LuciditeSetup.cs (postExposure 0.3).
